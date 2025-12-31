@@ -1,0 +1,86 @@
+<resources>
+    <string name="app_name" translatable="false">TaskTrophy</string>
+
+    <!--"Thanks for downloading!" first run dialog-->
+    <string name="first_launch_title">Welcome!</string>
+
+    <string name="default_notification_channel_id" translatable="false">Notification</string>
+
+    <string name="first_launch_message">Thank you for downloading the app!</string>
+
+    <!--Dialog buttons-->
+    <string name="later">Maybe later</string>
+    <string name="no">No</string>
+    <string name="yes">Yes</string>
+
+    <!--"Rate this app" dialog-->
+    <string name="rate_title">Do you like our app?</string>
+    <string name="rate_message">If so, please take a moment to rate this app.</string>
+    <string name="rate">Rate now</string>
+
+    <!--"Rate this app" dialog-->
+    <string name="facebook_title">Connect with us</string>
+    <string name="facebook_message">Become friends on Facebook?</string>
+
+    <!--Offline screen-->
+    <string name="offline_message_1">Connection down?</string>
+    <string name="offline_message_2">WiFi and mobile data are supported.</string>
+    <string name="try_again">Try again</string>
+
+    <!--"No connection" dialog-->
+    <string name="no_connection_title">Connection error</string>
+    <string name="no_connection_message">Please check your internet connection</string>
+    <string name="title_activity_show_web_view">App</string>
+
+    <!--"Do you want to exit this app?" dialog-->
+    <string name="exit_app_dialog">"Do you want to exit this app?"</string>
+
+    <string name="fcm_sender_id" translatable="false">XXXXXXXXXXXX</string>
+    <string name="pushwoosh_app_id" translatable="false">XXXXX-XXXXX</string>
+
+    <!--AdMob IDs-->
+    <string name="admob_app_id" translatable="false">ca-app-pub-6353903215132082~5351020639</string>
+    <string name="admob_rewarded_id" translatable="false">ca-app-pub-6353903215132082/9354694881</string>
+    <string name="banner_footer" translatable="false">ca-app-pub-6353903215132082/3797092354</string>
+    <string name="interstitial_full_screen" translatable="false">ca-app-pub-6353903215132082/1113242780</string>
+
+    <!--Facebook Ads IDs-->
+    <string name="facebook_banner_footer" translatable="false">IMG_16_9_APP_INSTALL#YOUR_PLACEMENT_ID</string>  <!-- Official Facebook Banner Ad Test ID: IMG_16_9_APP_INSTALL#YOUR_PLACEMENT_ID-->
+    <string name="facebook_interstitial_full_screen" translatable="false">IMG_16_9_APP_INSTALL#YOUR_PLACEMENT_ID</string>  <!-- Official Facebook Interstitial Fullscreen Ad Test ID: IMG_16_9_APP_INSTALL#YOUR_PLACEMENT_ID-->
+
+    <!--App Links URL scheme-->
+    <string name="deeplinking" translatable="false">WebViewGold</string>
+
+    <string name="local_notification_channel_name">Local channel</string>
+    <string name="local_notification_channel_description">Used to display local notifications</string>
+    <string name="local_notification_channel_id">Local notification</string>
+
+    <string name="msg_subscribed">Subscribed to Firebase push channel topic</string>
+
+    <string name="msg_subscribe_failed">Failed to subscribe to Firebase push channel topic</string>
+
+    <!--Downloader -->
+    <string name="download_noapp">No application can handle this request. Did you install a compatible app?</string>
+
+    <!--Web Authentication (WebAuthn) dialogs-->
+    <string name="username">Username</string>
+    <string name="password">Password</string>
+    <string name="submit">OK</string>
+    <string name="auth_dialogtitle">Login</string>
+    <string name="user_name_required">A username is required</string>
+    <string name="password_name_required">A password is required</string>
+
+    <string name="prompt_info_title">App Unlock</string>
+    <string name="prompt_info_subtitle">Please unlock using biometric to get access</string>
+    <string name="prompt_info_description">This app is using biometric authentication</string>
+    <string name="prompt_info_cancel">Cancel</string>
+    <string name="unlock_with_biometric">Unlock with biometric</string>
+    <string name="error_while_unlocking">Error while unlocking…</string>
+    <string name="unable_to_use_biometric_unlock">Unable to use biometric unlock</string>
+    <string name="authorize">Authorize</string>
+    <string name="require_biometric_unlock">%1$s requires biometric authorization to use app</string>
+
+    <string name="requires_location_permission">Without location permission, this feature won\'t work.</string>
+    <string name="no_camera_permission">This app cannot function properly without %1$s permission. Go to settings to accept it manually.</string>
+
+</resources>

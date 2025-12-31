@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="first_launch_title">Willkommen!</string>
+    <string name="default_notification_channel_id">Notification</string>
+    <string name="first_launch_message">Vielen Dank für das Herunterladen der App!</string>
+    <string name="later">Vielleicht später</string>
+    <string name="no">Nein</string>
+    <string name="yes">Ja</string>
+    <string name="rate_title">Magst du unsere App?</string>
+    <string name="rate_message">Wenn ja, nimm dir bitte einen Moment Zeit, um diese App zu bewerten.</string>
+    <string name="rate">Jetzt bewerten</string>
+    <string name="facebook_title">Mit uns befreunden</string>
+    <string name="facebook_message">Auf Facebook vernetzen?</string>
+    <string name="offline_message_1">Verbindung unterbrochen?</string>
+    <string name="offline_message_2">WiFi und mobile Daten werden unterstützt.</string>
+    <string name="try_again">Nochmal versuchen</string>
+    <string name="no_connection_title">Verbindungsfehler</string>
+    <string name="no_connection_message">Bitte überprüfe deine Internetverbindung</string>
+    <string name="title_activity_show_web_view">App</string>
+    <string name="exit_app_dialog">Willst du die App beenden?</string>
+    <string name="download_noapp">Keine App kann diese Datei anzeigen. Hast du eine kompatible App installiert?</string>
+    <string name="username">Benutzername</string>
+    <string name="password">Passwort</string>
+    <string name="submit">OK</string>
+    <string name="auth_dialogtitle">Anmelden</string>
+    <string name="user_name_required">Ein Benutzername ist erforderlich</string>
+    <string name="password_name_required">Ein Passwort ist erforderlich</string>
+
+    <string name="prompt_info_title">App-Entsperrung</string>
+    <string name="prompt_info_subtitle">Um Zugriff zu erhalten, entsperren Sie bitte mit biometrischen Daten</string>
+    <string name="prompt_info_description">Diese App verwendet biometrische Authentifizierung</string>
+    <string name="prompt_info_cancel">Abbrechen</string>
+    <string name="unlock_with_biometric">Entsperren mit Biometrie</string>
+    <string name="error_while_unlocking">Fehler beim Entsperren…</string>
+    <string name="unable_to_use_biometric_unlock">Biometrische Entsperrung kann nicht verwendet werden</string>
+    <string name="authorize">Autorisieren</string>
+    <string name="require_biometric_unlock">%1$s erfordert biometrische Autorisierung zur Nutzung der App</string>
+    <string name="requires_location_permission">Ohne Standortberechtigung funktioniert diese Funktion nicht.</string>
+    <string name="no_camera_permission">Diese App kann ohne die Berechtigung der %1$s nicht ordnungsgemäß funktionieren. Gehen Sie zu den Einstellungen, um sie manuell zu akzeptieren.</string>
+</resources>
