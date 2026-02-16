@@ -848,6 +848,9 @@ public class MainActivity extends AppCompatActivity
         // Add JavaScript interface for rewarded ads
         webView.addJavascriptInterface(new AndroidJSInterface(), "Android");
 
+        // Add Step King bridge for Health Connect step tracking
+        webView.addJavascriptInterface(new StepKingBridge(this, webView), "StepKing");
+
         Context appContext = this;
 
         // Collect the App Name to use as the title for Javascript Dialogs
