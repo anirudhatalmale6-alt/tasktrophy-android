@@ -268,6 +268,7 @@ public class MainActivity extends AppCompatActivity
 
     private static final String INDEX_FILE = "file:///android_asset/local-html/index.html";
     private static final int CODE_AUDIO_CHOOSER = 5678;
+    private StepKingBridge stepKingBridge;
     private boolean isErrorPageLoaded = false;
     public static boolean requireBioMetricAuthForSoftStart = enableBioMetricAuth && true; // BETA – set to "true" to ask biometric authentication for soft start      private static final String ONESIGNAL_APP_ID = BuildConfig.ONESIGNAL_APP_ID;
     private CustomWebView webView;
@@ -848,8 +849,9 @@ public class MainActivity extends AppCompatActivity
         // Add JavaScript interface for rewarded ads
         webView.addJavascriptInterface(new AndroidJSInterface(), "Android");
 
-        // Add Step King bridge for Health Connect step tracking
-        webView.addJavascriptInterface(new StepKingBridge(this, webView), "StepKing");
+        // Add Step King bridge for Google Fit step + heart points tracking
+        stepKingBridge = new StepKingBridge(this, webView);
+        webView.addJavascriptInterface(stepKingBridge, "StepKing");
 
         Context appContext = this;
 
@@ -1661,6 +1663,14 @@ public class MainActivity extends AppCompatActivity
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent intent) {
         super.onActivityResult(requestCode, resultCode, intent);
+
+        // Google Fit permission result
+        if (requestCode == StepKingBridge.GOOGLE_FIT_PERMISSIONS_REQUEST_CODE) {
+            if (resultCode == RESULT_OK && stepKingBridge != null) {
+                stepKingBridge.onPermissionGranted();
+            }
+            return;
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             if (requestCode == REQUEST_SELECT_FILE) {
