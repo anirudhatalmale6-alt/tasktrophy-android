@@ -39,6 +39,19 @@ public class WebViewApp extends MultiDexApplication {
         super.onCreate();
         context = this;
 
+        // Install global crash handler to save crash log to file
+        final Thread.UncaughtExceptionHandler defaultHandler = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
+            try {
+                java.io.File crashFile = new java.io.File(getExternalFilesDir(null), "crash_log.txt");
+                java.io.PrintWriter pw = new java.io.PrintWriter(new java.io.FileWriter(crashFile, true));
+                pw.println("=== CRASH " + new java.util.Date() + " ===");
+                throwable.printStackTrace(pw);
+                pw.close();
+            } catch (Exception ignored) {}
+            if (defaultHandler != null) defaultHandler.uncaughtException(thread, throwable);
+        });
+
         try { setupActivityListener(); } catch (Throwable t) { Log.e("WebViewApp", "setupActivityListener failed", t); }
         try { initFirebase(); } catch (Throwable t) { Log.e("WebViewApp", "initFirebase failed", t); }
         try { initOneSignal(); } catch (Throwable t) { Log.e("WebViewApp", "initOneSignal failed", t); }

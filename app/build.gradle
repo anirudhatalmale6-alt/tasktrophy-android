@@ -38,8 +38,8 @@ android {
             buildConfigField "String", "ONESIGNAL_APP_ID", ONESIGNAL_APP_ID
         }
         release {
-            minifyEnabled true
-            shrinkResources true
+            minifyEnabled false
+            shrinkResources false
             signingConfig signingConfigs.release
             buildConfigField "Boolean", "IS_DEBUG_MODE", 'false'
             buildConfigField "String", "ONESIGNAL_APP_ID", ONESIGNAL_APP_ID
