@@ -1,14 +1,13 @@
 {
   "project_info": {
-    "project_number": "11253849894",
-    "firebase_url": "https://tasktrophy-ludo-default-rtdb.asia-southeast1.firebasedatabase.app",
-    "project_id": "tasktrophy-ludo",
-    "storage_bucket": "tasktrophy-ludo.firebasestorage.app"
+    "project_number": "754795614042",
+    "project_id": "tasktrophy-official",
+    "storage_bucket": "tasktrophy-official.appspot.com"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:11253849894:android:3da27697d700657e386be7",
+        "mobilesdk_app_id": "1:754795614042:android:c682b8144a8dd52bc1ad63",
         "android_client_info": {
           "package_name": "com.tasktrophy.official"
         }
@@ -16,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyB6k2w5gkURV4SHwT0w6-MC_SFDtUrYee8"
+          "current_key": "AIzaSyDRKQ9d6kfsoZT2lUnZcZnBYvH69HExNPE"
         }
       ],
       "services": {
