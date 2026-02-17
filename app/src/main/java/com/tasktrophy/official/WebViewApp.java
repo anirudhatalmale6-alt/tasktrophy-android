@@ -39,21 +39,30 @@ public class WebViewApp extends MultiDexApplication {
         super.onCreate();
         context = this;
 
-        setupActivityListener();
-        initFirebase();
-        initOneSignal();
-        initAdsSDK();
-        initPushWooshSDK();
-        initRevenueCat();
+        try { setupActivityListener(); } catch (Throwable t) { Log.e("WebViewApp", "setupActivityListener failed", t); }
+        try { initFirebase(); } catch (Throwable t) { Log.e("WebViewApp", "initFirebase failed", t); }
+        try { initOneSignal(); } catch (Throwable t) { Log.e("WebViewApp", "initOneSignal failed", t); }
+        try { initAdsSDK(); } catch (Throwable t) { Log.e("WebViewApp", "initAdsSDK failed", t); }
+        try { initPushWooshSDK(); } catch (Throwable t) { Log.e("WebViewApp", "initPushWooshSDK failed", t); }
+        try { initRevenueCat(); } catch (Throwable t) { Log.e("WebViewApp", "initRevenueCat failed", t); }
     }
 
     private void initRevenueCat() {
-        Purchases.setLogLevel(com.revenuecat.purchases.LogLevel.DEBUG);
-        PurchasesConfiguration purchaseConfigs = new PurchasesConfiguration.Builder(
-                this,
-                Config.REVENUECAT_API_KEY
-        ).build();
-        Purchases.configure(purchaseConfigs);
+        try {
+            String key = Config.REVENUECAT_API_KEY;
+            if (key == null || key.isEmpty() || key.contains("xxxxx")) {
+                Log.w("WebViewApp", "RevenueCat API key not configured, skipping init");
+                return;
+            }
+            Purchases.setLogLevel(com.revenuecat.purchases.LogLevel.DEBUG);
+            PurchasesConfiguration purchaseConfigs = new PurchasesConfiguration.Builder(
+                    this,
+                    key
+            ).build();
+            Purchases.configure(purchaseConfigs);
+        } catch (Exception e) {
+            Log.e("WebViewApp", "RevenueCat init failed: " + e.getMessage());
+        }
     }
 
     private void initPushWooshSDK() {
