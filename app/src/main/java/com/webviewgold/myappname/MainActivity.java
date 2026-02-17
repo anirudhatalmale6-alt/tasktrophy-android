@@ -1680,14 +1680,6 @@ public class MainActivity extends AppCompatActivity
     public void onActivityResult(int requestCode, int resultCode, Intent intent) {
         super.onActivityResult(requestCode, resultCode, intent);
 
-        // Step King - Google Fit permission callback
-        if (requestCode == StepKingBridge.GOOGLE_FIT_PERMISSIONS_REQUEST_CODE) {
-            if (resultCode == RESULT_OK && stepKingBridge != null) {
-                stepKingBridge.onPermissionGranted();
-            }
-            return;
-        }
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             if (requestCode == REQUEST_SELECT_FILE) {
                 if (uploadMessage == null)
@@ -2314,6 +2306,15 @@ public class MainActivity extends AppCompatActivity
                     mGeolocationCallback.invoke(mGeolocationOrigin, false, false);
                 }
                 if (BuildConfig.IS_DEBUG_MODE) Log.d(TAG, "Location permission denied");
+            }
+        }
+
+        // Step King - Activity Recognition permission callback
+        if (requestCode == StepKingBridge.PERMISSION_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                if (stepKingBridge != null) {
+                    stepKingBridge.onPermissionGranted();
+                }
             }
         }
 

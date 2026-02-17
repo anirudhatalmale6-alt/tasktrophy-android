@@ -111,7 +111,5 @@ dependencies {
 
     implementation 'com.google.android.gms:play-services-code-scanner:16.1.0'
 
-    // Step King - Google Fit for steps + heart points
-    implementation 'com.google.android.gms:play-services-fitness:21.2.0'
-    implementation 'com.google.android.gms:play-services-auth:21.3.0'
+    // Step King uses hardware step sensor (no Google Fit / Cloud setup needed)
 }

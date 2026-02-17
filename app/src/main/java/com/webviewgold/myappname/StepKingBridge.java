@@ -2,54 +2,53 @@ package com.webviewgold.myappname;
 
 import android.app.Activity;
 import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.os.Build;
 import android.provider.Settings;
 import android.util.Log;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 
-import com.google.android.gms.auth.api.signin.GoogleSignIn;
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
-import com.google.android.gms.fitness.Fitness;
-import com.google.android.gms.fitness.FitnessOptions;
-import com.google.android.gms.fitness.data.DataType;
-import com.google.android.gms.fitness.data.Field;
-
 import org.json.JSONObject;
 
-public class StepKingBridge {
+/**
+ * Step King Bridge - uses hardware step counter sensor.
+ * No Google Cloud / Firebase setup required.
+ * Only needs ACTIVITY_RECOGNITION permission (Android 10+).
+ */
+public class StepKingBridge implements SensorEventListener {
 
     private static final String TAG = "StepKingBridge";
     private static final String PREFS_NAME = "stepking_prefs";
     private static final String KEY_STEPS_TODAY = "steps_today";
     private static final String KEY_STEPS_DATE = "steps_date";
-    private static final String KEY_HEART_POINTS = "heart_points_today";
-    public static final int GOOGLE_FIT_PERMISSIONS_REQUEST_CODE = 9002;
+    private static final String KEY_SENSOR_BASELINE = "sensor_baseline";
+    private static final String KEY_SENSOR_BASELINE_DATE = "sensor_baseline_date";
+
+    public static final int PERMISSION_REQUEST_CODE = 9002;
 
     private final Context context;
     private final WebView webView;
+    private SensorManager sensorManager;
+    private Sensor stepCounterSensor;
+    private boolean sensorRegistered = false;
+
     private long todaySteps = 0;
-    private float todayHeartPoints = 0;
-
-    private static FitnessOptions fitnessOptions;
-
-    private static FitnessOptions getFitnessOptions() {
-        if (fitnessOptions == null) {
-            fitnessOptions = FitnessOptions.builder()
-                .addDataType(DataType.TYPE_STEP_COUNT_DELTA, FitnessOptions.ACCESS_READ)
-                .addDataType(DataType.TYPE_HEART_POINTS, FitnessOptions.ACCESS_READ)
-                .addDataType(DataType.AGGREGATE_STEP_COUNT_DELTA, FitnessOptions.ACCESS_READ)
-                .addDataType(DataType.AGGREGATE_HEART_POINTS, FitnessOptions.ACCESS_READ)
-                .build();
-        }
-        return fitnessOptions;
-    }
+    private float sensorBaseline = -1; // first sensor reading of the day
 
     public StepKingBridge(Context context, WebView webView) {
         this.context = context;
         this.webView = webView;
+
+        sensorManager = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
+        if (sensorManager != null) {
+            stepCounterSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER);
+        }
+
         loadCachedData();
     }
 
@@ -57,73 +56,119 @@ public class StepKingBridge {
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String cachedDate = prefs.getString(KEY_STEPS_DATE, "");
         String today = java.time.LocalDate.now().toString();
+
         if (today.equals(cachedDate)) {
             todaySteps = prefs.getLong(KEY_STEPS_TODAY, 0);
-            todayHeartPoints = prefs.getFloat(KEY_HEART_POINTS, 0);
+            // Restore baseline for today
+            String baselineDate = prefs.getString(KEY_SENSOR_BASELINE_DATE, "");
+            if (today.equals(baselineDate)) {
+                sensorBaseline = prefs.getFloat(KEY_SENSOR_BASELINE, -1);
+            } else {
+                sensorBaseline = -1;
+            }
         } else {
+            // New day - reset
             todaySteps = 0;
-            todayHeartPoints = 0;
+            sensorBaseline = -1;
             prefs.edit()
                 .putLong(KEY_STEPS_TODAY, 0)
                 .putString(KEY_STEPS_DATE, today)
-                .putFloat(KEY_HEART_POINTS, 0)
+                .putFloat(KEY_SENSOR_BASELINE, -1)
+                .putString(KEY_SENSOR_BASELINE_DATE, today)
                 .apply();
         }
     }
 
-    private void saveData(long steps, float heartPoints) {
+    private void saveData(long steps) {
         todaySteps = steps;
-        todayHeartPoints = heartPoints;
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit()
+        String today = java.time.LocalDate.now().toString();
+        SharedPreferences.Editor editor = prefs.edit()
             .putLong(KEY_STEPS_TODAY, steps)
-            .putString(KEY_STEPS_DATE, java.time.LocalDate.now().toString())
-            .putFloat(KEY_HEART_POINTS, heartPoints)
-            .apply();
+            .putString(KEY_STEPS_DATE, today);
+
+        if (sensorBaseline >= 0) {
+            editor.putFloat(KEY_SENSOR_BASELINE, sensorBaseline);
+            editor.putString(KEY_SENSOR_BASELINE_DATE, today);
+        }
+        editor.apply();
     }
+
+    // ─── SensorEventListener ───
+
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+        if (event.sensor.getType() == Sensor.TYPE_STEP_COUNTER) {
+            float totalStepsSinceBoot = event.values[0];
+            String today = java.time.LocalDate.now().toString();
+            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            String baselineDate = prefs.getString(KEY_SENSOR_BASELINE_DATE, "");
+
+            // Reset baseline if it's a new day
+            if (!today.equals(baselineDate) || sensorBaseline < 0) {
+                sensorBaseline = totalStepsSinceBoot;
+                todaySteps = 0;
+                prefs.edit()
+                    .putFloat(KEY_SENSOR_BASELINE, sensorBaseline)
+                    .putString(KEY_SENSOR_BASELINE_DATE, today)
+                    .putLong(KEY_STEPS_TODAY, 0)
+                    .putString(KEY_STEPS_DATE, today)
+                    .apply();
+            }
+
+            long stepsToday = (long) (totalStepsSinceBoot - sensorBaseline);
+            if (stepsToday < 0) {
+                // Device rebooted (sensor reset), use totalStepsSinceBoot as new baseline
+                sensorBaseline = totalStepsSinceBoot;
+                // Keep previously accumulated steps
+                stepsToday = todaySteps;
+            }
+
+            saveData(stepsToday);
+            Log.d(TAG, "Steps today: " + stepsToday + " (sensor total: " + totalStepsSinceBoot + ", baseline: " + sensorBaseline + ")");
+
+            // Notify JS
+            callJsCallback(stepsToday, null);
+        }
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+        // Not needed
+    }
+
+    // ─── JS Interface Methods ───
 
     @JavascriptInterface
     public boolean isAvailable() {
-        try {
-            return GoogleSignIn.getLastSignedInAccount(context) != null
-                || com.google.android.gms.common.GoogleApiAvailability.getInstance()
-                    .isGooglePlayServicesAvailable(context) == com.google.android.gms.common.ConnectionResult.SUCCESS;
-        } catch (Exception e) {
-            return false;
-        }
+        return stepCounterSensor != null;
     }
 
     @JavascriptInterface
     public boolean hasPermission() {
-        try {
-            GoogleSignInAccount account = GoogleSignIn.getAccountForExtension(context, getFitnessOptions());
-            return GoogleSignIn.hasPermissions(account, getFitnessOptions());
-        } catch (Exception e) {
-            return false;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            return context.checkSelfPermission(android.Manifest.permission.ACTIVITY_RECOGNITION)
+                == android.content.pm.PackageManager.PERMISSION_GRANTED;
         }
+        return true; // Not needed below Android 10
     }
 
     @JavascriptInterface
     public void requestPermission() {
         if (context instanceof Activity) {
-            ((Activity) context).runOnUiThread(() -> {
-                try {
-                    GoogleSignInAccount account = GoogleSignIn.getAccountForExtension(context, getFitnessOptions());
-                    if (!GoogleSignIn.hasPermissions(account, getFitnessOptions())) {
-                        GoogleSignIn.requestPermissions(
-                            (Activity) context,
-                            GOOGLE_FIT_PERMISSIONS_REQUEST_CODE,
-                            account,
-                            getFitnessOptions()
-                        );
-                    } else {
-                        refreshSteps();
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "Error requesting Google Fit permission: " + e.getMessage());
-                    callJsCallback(-1, "Failed to request permission: " + e.getMessage());
+            Activity activity = (Activity) context;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                if (!hasPermission()) {
+                    activity.requestPermissions(
+                        new String[]{android.Manifest.permission.ACTIVITY_RECOGNITION},
+                        PERMISSION_REQUEST_CODE
+                    );
+                    return;
                 }
-            });
+            }
+            // Already have permission, start sensor
+            startListening();
+            callJsCallback(todaySteps, null);
         }
     }
 
@@ -134,73 +179,28 @@ public class StepKingBridge {
 
     @JavascriptInterface
     public void refreshSteps() {
-        if (!(context instanceof Activity)) return;
+        if (!hasPermission()) {
+            callJsCallback(-1, "Activity Recognition permission not granted");
+            return;
+        }
 
-        ((Activity) context).runOnUiThread(() -> {
-            try {
-                GoogleSignInAccount account = GoogleSignIn.getAccountForExtension(context, getFitnessOptions());
-                if (!GoogleSignIn.hasPermissions(account, getFitnessOptions())) {
-                    callJsCallback(-1, "Google Fit permission not granted");
-                    return;
-                }
+        if (!isAvailable()) {
+            callJsCallback(-1, "Step counter sensor not available on this device");
+            return;
+        }
 
-                Fitness.getHistoryClient((Activity) context, account)
-                    .readDailyTotal(DataType.TYPE_STEP_COUNT_DELTA)
-                    .addOnSuccessListener(dataSet -> {
-                        long steps = 0;
-                        if (!dataSet.isEmpty()) {
-                            steps = dataSet.getDataPoints().get(0)
-                                .getValue(Field.FIELD_STEPS).asInt();
-                        }
-                        saveData(steps, todayHeartPoints);
-                        callJsCallback(steps, null);
-                        Log.d(TAG, "Google Fit steps: " + steps);
-                    })
-                    .addOnFailureListener(e -> {
-                        Log.e(TAG, "Failed to read steps: " + e.getMessage());
-                        callJsCallback(-1, "Failed to read steps: " + e.getMessage());
-                    });
-            } catch (Exception e) {
-                Log.e(TAG, "Error reading steps: " + e.getMessage());
-                callJsCallback(-1, e.getMessage());
-            }
-        });
+        // Start/restart sensor listener
+        startListening();
+
+        // Return cached value immediately (sensor will update async)
+        callJsCallback(todaySteps, null);
     }
 
     @JavascriptInterface
     public void getHeartPoints() {
-        if (!(context instanceof Activity)) return;
-
-        ((Activity) context).runOnUiThread(() -> {
-            try {
-                GoogleSignInAccount account = GoogleSignIn.getAccountForExtension(context, getFitnessOptions());
-                if (!GoogleSignIn.hasPermissions(account, getFitnessOptions())) {
-                    callJsHeartPoints(-1, "Google Fit permission not granted");
-                    return;
-                }
-
-                Fitness.getHistoryClient((Activity) context, account)
-                    .readDailyTotal(DataType.TYPE_HEART_POINTS)
-                    .addOnSuccessListener(dataSet -> {
-                        float points = 0;
-                        if (!dataSet.isEmpty()) {
-                            points = dataSet.getDataPoints().get(0)
-                                .getValue(Field.FIELD_INTENSITY).asFloat();
-                        }
-                        todayHeartPoints = points;
-                        saveData(todaySteps, points);
-                        callJsHeartPoints(points, null);
-                        Log.d(TAG, "Google Fit heart points: " + points);
-                    })
-                    .addOnFailureListener(e -> {
-                        Log.e(TAG, "Failed to read heart points: " + e.getMessage());
-                        callJsHeartPoints(-1, "Failed to read heart points");
-                    });
-            } catch (Exception e) {
-                Log.e(TAG, "Error reading heart points: " + e.getMessage());
-                callJsHeartPoints(-1, e.getMessage());
-            }
-        });
+        // Heart points not available with hardware sensor
+        // Return 0 - the web UI can hide this if not supported
+        callJsHeartPoints(0, null);
     }
 
     @JavascriptInterface
@@ -230,20 +230,39 @@ public class StepKingBridge {
             info.put("model", Build.MODEL);
             info.put("manufacturer", Build.MANUFACTURER);
             info.put("sdk", Build.VERSION.SDK_INT);
-            info.put("googleFitAvailable", isAvailable());
+            info.put("stepSensorAvailable", isAvailable());
             info.put("hasPermission", hasPermission());
             info.put("todaySteps", todaySteps);
-            info.put("todayHeartPoints", todayHeartPoints);
+            info.put("source", "hardware_sensor");
             return info.toString();
         } catch (Exception e) {
             return "{}";
         }
     }
 
-    public void onPermissionGranted() {
-        refreshSteps();
-        getHeartPoints();
+    // ─── Sensor Management ───
+
+    public void startListening() {
+        if (sensorRegistered || stepCounterSensor == null) return;
+        sensorManager.registerListener(this, stepCounterSensor, SensorManager.SENSOR_DELAY_NORMAL);
+        sensorRegistered = true;
+        Log.d(TAG, "Step counter sensor listener registered");
     }
+
+    public void stopListening() {
+        if (!sensorRegistered) return;
+        sensorManager.unregisterListener(this);
+        sensorRegistered = false;
+        Log.d(TAG, "Step counter sensor listener unregistered");
+    }
+
+    /** Called from MainActivity when ACTIVITY_RECOGNITION permission is granted */
+    public void onPermissionGranted() {
+        startListening();
+        callJsCallback(todaySteps, null);
+    }
+
+    // ─── JS Callbacks ───
 
     private void callJsCallback(long steps, String error) {
         if (context instanceof Activity) {
