@@ -1,0 +1,14 @@
+com.anjlab.android.iab.v3.inapp-lifecycle-viewmodel-2.3.1-0 /home/freelancer3/.gradle/caches/8.10/transforms/1b7fff291baaa470d02b5a32da226ccf/transformed/lifecycle-viewmodel-2.3.1/res
+com.anjlab.android.iab.v3.inapp-lifecycle-runtime-2.3.1-1 /home/freelancer3/.gradle/caches/8.10/transforms/58d50044ac3d8c7c41929d5f92d56255/transformed/lifecycle-runtime-2.3.1/res
+com.anjlab.android.iab.v3.inapp-core-1.2.0-2 /home/freelancer3/.gradle/caches/8.10/transforms/6e8c3e6783c5ccc4b7673175ee47298a/transformed/core-1.2.0/res
+com.anjlab.android.iab.v3.inapp-jetified-play-services-basement-18.4.0-3 /home/freelancer3/.gradle/caches/8.10/transforms/8c352a138bb03424b66bb63b3f407d46/transformed/jetified-play-services-basement-18.4.0/res
+com.anjlab.android.iab.v3.inapp-jetified-savedstate-1.1.0-4 /home/freelancer3/.gradle/caches/8.10/transforms/c2d2621bf3e1e94f316c2855a6308070/transformed/jetified-savedstate-1.1.0/res
+com.anjlab.android.iab.v3.inapp-jetified-play-services-base-18.5.0-5 /home/freelancer3/.gradle/caches/8.10/transforms/cc4af521cc11555a17f242f9e8e9002e/transformed/jetified-play-services-base-18.5.0/res
+com.anjlab.android.iab.v3.inapp-jetified-billing-7.1.1-6 /home/freelancer3/.gradle/caches/8.10/transforms/fcf7b78b5d1328d29ec51f167a3f5a25/transformed/jetified-billing-7.1.1/res
+com.anjlab.android.iab.v3.inapp-pngs-7 /var/lib/freelancer/projects/40107975/TaskTrophy_Project/inapp/build/generated/res/pngs/release
+com.anjlab.android.iab.v3.inapp-resValues-8 /var/lib/freelancer/projects/40107975/TaskTrophy_Project/inapp/build/generated/res/resValues/release
+com.anjlab.android.iab.v3.inapp-mergeReleaseResources-9 /var/lib/freelancer/projects/40107975/TaskTrophy_Project/inapp/build/intermediates/incremental/release/mergeReleaseResources/merged.dir
+com.anjlab.android.iab.v3.inapp-mergeReleaseResources-10 /var/lib/freelancer/projects/40107975/TaskTrophy_Project/inapp/build/intermediates/incremental/release/mergeReleaseResources/stripped.dir
+com.anjlab.android.iab.v3.inapp-release-11 /var/lib/freelancer/projects/40107975/TaskTrophy_Project/inapp/build/intermediates/merged_res/release/mergeReleaseResources
+com.anjlab.android.iab.v3.inapp-main-12 /var/lib/freelancer/projects/40107975/TaskTrophy_Project/inapp/src/main/res
+com.anjlab.android.iab.v3.inapp-release-13 /var/lib/freelancer/projects/40107975/TaskTrophy_Project/inapp/src/release/res

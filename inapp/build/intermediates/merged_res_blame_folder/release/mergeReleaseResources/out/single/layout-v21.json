@@ -1,0 +1,18 @@
+[
+    {
+        "merged": "com.anjlab.android.iab.v3.inapp-release-10:/layout-v21/notification_template_icon_group.xml",
+        "source": "com.anjlab.android.iab.v3.inapp-core-1.2.0-2:/layout-v21/notification_template_icon_group.xml"
+    },
+    {
+        "merged": "com.anjlab.android.iab.v3.inapp-release-10:/layout-v21/notification_action.xml",
+        "source": "com.anjlab.android.iab.v3.inapp-core-1.2.0-2:/layout-v21/notification_action.xml"
+    },
+    {
+        "merged": "com.anjlab.android.iab.v3.inapp-release-10:/layout-v21/notification_action_tombstone.xml",
+        "source": "com.anjlab.android.iab.v3.inapp-core-1.2.0-2:/layout-v21/notification_action_tombstone.xml"
+    },
+    {
+        "merged": "com.anjlab.android.iab.v3.inapp-release-10:/layout-v21/notification_template_custom_big.xml",
+        "source": "com.anjlab.android.iab.v3.inapp-core-1.2.0-2:/layout-v21/notification_template_custom_big.xml"
+    }
+]

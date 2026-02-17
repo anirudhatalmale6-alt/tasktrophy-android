@@ -1,0 +1,34 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.anjlab.android.iab.v3.inapp-mergeReleaseResources-8:/values-en-rXC/values-en-rXC.xml",
+            "map": [
+                {
+                    "source": "/home/freelancer3/.gradle/caches/8.10/transforms/6e8c3e6783c5ccc4b7673175ee47298a/transformed/core-1.2.0/res/values-en-rXC/values-en-rXC.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "203",
+                        "endOffsets": "254"
+                    }
+                }
+            ]
+        },
+        {
+            "outputFile": "com.anjlab.android.iab.v3.inapp-release-10:/values-en-rXC/values-en-rXC.xml",
+            "map": [
+                {
+                    "source": "/home/freelancer3/.gradle/caches/8.10/transforms/6e8c3e6783c5ccc4b7673175ee47298a/transformed/core-1.2.0/res/values-en-rXC/values-en-rXC.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "203",
+                        "endOffsets": "254"
+                    }
+                }
+            ]
+        }
+    ]
+}

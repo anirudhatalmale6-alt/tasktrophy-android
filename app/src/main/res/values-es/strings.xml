@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="first_launch_title">¡Bienvenido!</string>
+    <string name="default_notification_channel_id">Notificación</string>
+    <string name="first_launch_message">¡Muchas gracias por descargar la aplicación!</string>
+    <string name="later">Quizás más tarde</string>
+    <string name="no">No</string>
+    <string name="yes">Sí</string>
+    <string name="rate_title">¿Te gusta nuestra aplicación?</string>
+    <string name="rate_message">Si te gusta, por favor tómate un momento para calificar esta aplicación.</string>
+    <string name="rate">Calificar ahora</string>
+    <string name="facebook_title">Hazte amigo nuestro</string>
+    <string name="facebook_message">¿Conectarse en Facebook?</string>
+    <string name="offline_message_1">¿Conexión interrumpida?</string>
+    <string name="offline_message_2">WiFi y datos móviles son compatibles.</string>
+    <string name="try_again">Intentar de nuevo</string>
+    <string name="no_connection_title">Error de conexión</string>
+    <string name="no_connection_message">Por favor, comprueba tu conexión</string>
+    <string name="title_activity_show_web_view">Aplicación</string>
+    <string name="exit_app_dialog">¿Quieres cerrar la aplicación?</string>
+    <string name="download_noapp">Ninguna aplicación puede manejar esta solicitud. ¿Instaló usted una aplicación compatible?</string>
+    <string name="username">Nombre de usuario</string>
+    <string name="password">Contraseña</string>
+    <string name="submit">OK</string>
+    <string name="auth_dialogtitle">Iniciar sesión</string>
+    <string name="user_name_required">Se requiere un nombre de usuario</string>
+    <string name="password_name_required">Se requiere una contraseña</string>
+
+
+    <string name="prompt_info_title">Desbloqueo de la aplicación</string>
+    <string name="prompt_info_subtitle">Desbloquee usando datos biométricos para obtener acceso.</string>
+    <string name="prompt_info_description">Autenticación biométrica</string>
+    <string name="prompt_info_cancel">Cancelar</string>
+    <string name="unlock_with_biometric">Desbloquear con biométrico</string>
+    <string name="error_while_unlocking">Error al desbloquear…</string>
+    <string name="unable_to_use_biometric_unlock">No se puede utilizar el desbloqueo biométrico</string>
+    <string name="authorize">Autorizar</string>
+    <string name="require_biometric_unlock">%1$s requiere autorización biométrica para usar la aplicación</string>
+    <string name="requires_location_permission">Sans autorisation de localisation, cette fonctionnalité ne fonctionnera pas.</string>
+    <string name="no_camera_permission">Esta aplicación no puede funcionar correctamente sin el permiso de la %1$s. Vaya a configuración para aceptarlo manualmente.</string>
+</resources>

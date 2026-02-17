@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#4FaFFf</color>
+    <color name="colorPrimaryDark">#0F7FFC</color> <!-- Used for Color of the Status Bar-->
+    <color name="colorAccent">#6A6A6A</color> <!-- Used for Color of the Loading Sign and Dialogue Buttons -->
+    <color name="launchLoadingSignBackground">#FFFFFF</color> <!-- Background Color for Loading Sign Screen on launch -->
+    <color name="colorWhite">#FFFFFF</color> <!-- Background Color for Splash Screen -->
+    <color name="colorTransparent">#00FFFFFF</color>
+    <color name="ic_launcher_background">#FFFFFF</color> <!-- Background Color for ic_launcher Icon -->
+    <color name="player_icon_tint">#CECECE</color> <!-- Video player icon tint -->
+</resources>

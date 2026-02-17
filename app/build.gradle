@@ -1,0 +1,111 @@
+apply plugin: 'com.onesignal.androidsdk.onesignal-gradle-plugin'
+apply plugin: 'com.android.application'
+apply plugin: 'com.google.gms.google-services'
+
+android {
+
+    ext {
+        // Please insert your OneSignal ID here, then sync and rebuild your project:
+        ONESIGNAL_APP_ID = '"6d9ccfea-89c6-458b-baab-39ba103ece1d"'
+    }
+    compileSdk 35
+    namespace "com.webviewgold.myappname"
+    defaultConfig {
+        applicationId "com.tasktrophy.official"
+        minSdk 23
+        targetSdk 35
+        versionCode 26
+        versionName "2.6"
+        multiDexEnabled true
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        manifestPlaceholders = [
+                onesignal_app_id: ONESIGNAL_APP_ID,
+                onesignal_google_project_number: 'REMOTE'
+        ]
+    }
+    signingConfigs {
+        release {
+            storeFile file("tasktrophy.keystore")
+            storePassword "tasktrophy123"
+            keyAlias "tasktrophy"
+            keyPassword "tasktrophy123"
+        }
+    }
+    buildTypes {
+        debug {
+            debuggable true
+            buildConfigField "Boolean", "IS_DEBUG_MODE", 'true'
+            buildConfigField "String", "ONESIGNAL_APP_ID", ONESIGNAL_APP_ID
+        }
+        release {
+            minifyEnabled true
+            shrinkResources true
+            signingConfig signingConfigs.release
+            buildConfigField "Boolean", "IS_DEBUG_MODE", 'false'
+            buildConfigField "String", "ONESIGNAL_APP_ID", ONESIGNAL_APP_ID
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    buildFeatures {
+        buildConfig = true // Enable BuildConfig feature
+    }
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation 'androidx.core:core:1.2.0'
+    implementation 'androidx.activity:activity:1.10.1'
+    androidTestImplementation('androidx.test.espresso:espresso-core:3.1.0', {
+        exclude group: 'com.android.support', module: 'support-annotations'
+    })
+
+    implementation platform('com.google.firebase:firebase-bom:27.1.0')
+
+    implementation 'com.onesignal:OneSignal:[5.0.0, 5.1.99]'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'com.google.android.material:material:1.6.1'
+    testImplementation 'junit:junit:4.13.2'
+    implementation 'com.google.android.gms:play-services-ads:23.1.0'
+
+    // AdMob Mediation - Unity Ads (updated for bidding support)
+    implementation 'com.unity3d.ads:unity-ads:4.12.4'
+    implementation 'com.google.ads.mediation:unity:4.12.4.0'
+
+    // AdMob Mediation - Meta Audience Network (Facebook) - bidding support
+    implementation 'com.google.ads.mediation:facebook:6.18.0.0'
+    implementation 'androidx.browser:browser:1.4.0'
+    implementation 'com.github.ybq:Android-SpinKit:1.4.0'
+    implementation 'com.github.jaiselrahman:FilePicker:1.3.2'
+    implementation 'com.android.billingclient:billing:7.0.0'
+    implementation 'com.google.android.gms:play-services-location:[17.0.0, 17.99.99]'
+    implementation 'com.github.bumptech.glide:glide:4.13.2'
+    annotationProcessor 'com.github.bumptech.glide:compiler:4.13.2'
+
+    implementation 'pl.droidsonroids.gif:android-gif-drawable:1.2.29'
+
+    implementation 'com.github.blikoon:QRCodeScanner:0.1.2'
+
+    implementation 'com.google.firebase:firebase-analytics:21.1.0'
+    implementation 'com.google.firebase:firebase-messaging:23.0.7'
+    implementation 'androidx.annotation:annotation:1.4.0'
+    implementation 'com.facebook.android:audience-network-sdk:6.17.0'
+    implementation 'androidx.work:work-runtime:2.8.0-alpha03'
+
+    implementation 'androidx.core:core-splashscreen:1.0.0'
+
+    implementation 'com.pushwoosh:pushwoosh-firebase:6.7.10'
+    implementation 'androidx.biometric:biometric:1.1.0'
+    implementation 'androidx.lifecycle:lifecycle-process:2.3.1'
+    implementation 'com.google.code.gson:gson:2.10.1'
+    implementation 'com.android.support:multidex:1.0.3'
+    implementation("com.google.android.ump:user-messaging-platform:3.1.0")
+
+    implementation("com.revenuecat.purchases:purchases:8.17.0")
+
+    implementation 'com.google.android.gms:play-services-code-scanner:16.1.0'
+}

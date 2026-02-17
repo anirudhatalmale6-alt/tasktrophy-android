@@ -1,0 +1,14 @@
+[
+    {
+        "merged": "com.anjlab.android.iab.v3.inapp-release-10:/color/common_google_signin_btn_tint.xml",
+        "source": "com.anjlab.android.iab.v3.inapp-jetified-play-services-base-18.5.0-5:/color/common_google_signin_btn_tint.xml"
+    },
+    {
+        "merged": "com.anjlab.android.iab.v3.inapp-release-10:/color/common_google_signin_btn_text_light.xml",
+        "source": "com.anjlab.android.iab.v3.inapp-jetified-play-services-base-18.5.0-5:/color/common_google_signin_btn_text_light.xml"
+    },
+    {
+        "merged": "com.anjlab.android.iab.v3.inapp-release-10:/color/common_google_signin_btn_text_dark.xml",
+        "source": "com.anjlab.android.iab.v3.inapp-jetified-play-services-base-18.5.0-5:/color/common_google_signin_btn_text_dark.xml"
+    }
+]

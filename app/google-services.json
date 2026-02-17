@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "xxxxxxxxxxx",
+    "project_id": "xxxxxxxxxxx",
+    "storage_bucket": "xxxxxxxxxxx"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "xxxxxxxxxxx",
+        "android_client_info": {
+          "package_name": "com.tasktrophy.official"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "xxxxxxxxxxx",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "xxxxxxxxxxx"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "xxxxxxxxxxx",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,6 @@
+[
+    {
+        "merged": "com.anjlab.android.iab.v3.inapp-release-10:/xml/com_android_billingclient_phenotype.xml",
+        "source": "com.anjlab.android.iab.v3.inapp-jetified-billing-7.1.1-6:/xml/com_android_billingclient_phenotype.xml"
+    }
+]

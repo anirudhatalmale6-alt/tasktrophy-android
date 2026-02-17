@@ -1,0 +1,100 @@
+apply plugin: 'com.android.library'
+apply plugin: 'signing'
+apply plugin: 'checkstyle'
+
+group 'com.anjlab.android.iab.v3'
+version '1.1.0'
+
+android {
+    compileSdk 34
+    namespace "com.anjlab.android.iab.v3"
+    defaultConfig {
+        minSdkVersion 22
+        targetSdkVersion 35
+        consumerProguardFiles 'progress-proguard.txt'
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+    }
+
+    testOptions.unitTests {
+        // Don't throw runtime exceptions for android calls that are not mocked
+        returnDefaultValues = true
+
+        all {
+            testLogging {
+                events 'passed', 'skipped', 'failed', 'standardOut', 'standardError'
+            }
+        }
+    }
+}
+
+dependencies {
+    androidTestImplementation 'com.android.support.test:runner:1.0.2'
+    androidTestImplementation 'com.android.support.test:rules:1.0.2'
+    implementation 'com.android.support:support-annotations:28.0.0'
+    implementation 'com.android.billingclient:billing:7.1.1'
+}
+
+configurations.archives.extendsFrom configurations.default
+
+signing {
+    required { gradle.taskGraph.hasTask("uploadArchives") }
+    sign configurations.archives
+}
+
+tasks.register('androidJavadocs', Javadoc) {
+    source = 'src/main/java,src/main/aidl'
+    //classpath += project.files(android.getBootClasspath().join(File.pathSeparator))
+}
+
+tasks.register('androidJavadocsJar', Jar) {
+    dependsOn androidJavadocs
+    archiveClassifier.set('javadoc')
+    from androidJavadocs.destinationDir
+}
+
+tasks.register('androidSourcesJar', Jar) {
+    archiveClassifier.set('sources')
+    from 'src/main/java'
+}
+
+artifacts {
+    archives androidSourcesJar
+    archives androidJavadocsJar
+}
+
+tasks.register('checkstyle', Checkstyle) {
+    configFile file("${project.rootDir}/checkstyle.xml")
+    source 'src'
+    include '**/*.java'
+    exclude '**/gen/**'
+
+    classpath = files()
+}
+
+check.dependsOn('checkstyle')
+connectedCheck.dependsOn('checkstyle')
+android.libraryVariants.configureEach { variant ->
+    def name = variant.buildType.name
+    if (name == 'debug') {
+        return // Skip debug builds.
+    }
+
+    def task = project.tasks.register("jar${name.capitalize()}", Jar) {
+        it.dependsOn(variant.javaCompileProvider) // Schedule to run after javaCompileProvider
+        it.from(variant.javaCompileProvider.get().destinationDir)
+        it.archiveBaseName.set("anjlab-iabv3")
+
+        doLast {
+            println "Copying jar to sample project..."
+            copy {
+                from it.archiveFile.get()
+                into '../sample/libs'
+                rename { String fileName -> 'anjlab-iabv3-current.jar' }
+            }
+        }
+    }
+
+    artifacts {
+        add("archives", task)
+    }
+}
