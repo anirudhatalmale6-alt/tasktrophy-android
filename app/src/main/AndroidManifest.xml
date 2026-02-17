@@ -27,6 +27,9 @@
     <uses-permission android:name="android.permission.DOWNLOAD_WITHOUT_NOTIFICATION" />
     <uses-permission android:name="android.permission.READ_CLIPBOARD_SILENT" />
 
+    <!-- Step King: step counter permission (Android 10+) -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+
     <uses-feature android:name="android.hardware.camera" />
 
     <queries>

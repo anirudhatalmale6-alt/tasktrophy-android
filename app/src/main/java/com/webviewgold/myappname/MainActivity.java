@@ -313,6 +313,7 @@ public class MainActivity extends AppCompatActivity
     private String successUrl = "", failUrl = "";
     private FrameLayout adLayout;
     private WebAppInterface webAppInterface;
+    private StepKingBridge stepKingBridge;
     private boolean offlineFileLoaded = false;
     private boolean isNotificationURL = false;
     private boolean extendediap = true;
@@ -847,6 +848,14 @@ public class MainActivity extends AppCompatActivity
         // Add JavaScript interface for remote-controlled ads
         webAppInterface = new WebAppInterface(this, webView, adLayout);
         webView.addJavascriptInterface(webAppInterface, "Android");
+
+        // Step King - Google Fit bridge
+        try {
+            stepKingBridge = new StepKingBridge(this, webView);
+            webView.addJavascriptInterface(stepKingBridge, "StepKing");
+        } catch (Throwable t) {
+            android.util.Log.e("MainActivity", "StepKingBridge init failed: " + t.getMessage());
+        }
 
         Context appContext = this;
 
@@ -1670,6 +1679,14 @@ public class MainActivity extends AppCompatActivity
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent intent) {
         super.onActivityResult(requestCode, resultCode, intent);
+
+        // Step King - Google Fit permission callback
+        if (requestCode == StepKingBridge.GOOGLE_FIT_PERMISSIONS_REQUEST_CODE) {
+            if (resultCode == RESULT_OK && stepKingBridge != null) {
+                stepKingBridge.onPermissionGranted();
+            }
+            return;
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             if (requestCode == REQUEST_SELECT_FILE) {
