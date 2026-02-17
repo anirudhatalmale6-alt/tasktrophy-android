@@ -70,6 +70,15 @@
             android:name="com.google.firebase.provider.FirebaseInitProvider"
             android:authorities="${applicationId}.firebaseinitprovider"
             tools:node="remove" />
+        <!-- Disable Pushwoosh auto-init providers (not configured) -->
+        <provider
+            android:name="com.pushwoosh.PushwooshInitProvider"
+            android:authorities="${applicationId}.pushwooshinitprovider"
+            tools:node="remove" />
+        <provider
+            android:name="com.pushwoosh.firebase.FirebaseInitProvider"
+            android:authorities="${applicationId}.pushwooshfirebaseinitprovider"
+            tools:node="remove" />
 
         <activity
             android:name=".nfc.MyNfcActivity"

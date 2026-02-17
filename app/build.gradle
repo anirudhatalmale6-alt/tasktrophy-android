@@ -6,7 +6,7 @@ android {
 
     ext {
         // Please insert your OneSignal ID here, then sync and rebuild your project:
-        ONESIGNAL_APP_ID = '"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"'
+        ONESIGNAL_APP_ID = '"6d9ccfea-89c6-458b-baab-39ba103ece1d"'
     }
     compileSdk 35
     namespace "com.tasktrophy.official"
