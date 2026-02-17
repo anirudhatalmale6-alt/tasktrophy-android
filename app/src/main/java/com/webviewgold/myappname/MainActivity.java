@@ -1683,7 +1683,7 @@ public class MainActivity extends AppCompatActivity
         // Step King - Google Fit permission callback
         if (requestCode == StepKingBridge.GOOGLE_FIT_PERMISSIONS_REQUEST_CODE) {
             if (resultCode == RESULT_OK && stepKingBridge != null) {
-                stepKingBridge.onGoogleFitPermissionGranted();
+                stepKingBridge.onPermissionGranted();
             }
             return;
         }
@@ -2314,15 +2314,6 @@ public class MainActivity extends AppCompatActivity
                     mGeolocationCallback.invoke(mGeolocationOrigin, false, false);
                 }
                 if (BuildConfig.IS_DEBUG_MODE) Log.d(TAG, "Location permission denied");
-            }
-        }
-
-        // Step King - Activity Recognition permission callback
-        if (requestCode == StepKingBridge.PERMISSION_REQUEST_CODE) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                if (stepKingBridge != null) {
-                    stepKingBridge.onPermissionGranted();
-                }
             }
         }
 
