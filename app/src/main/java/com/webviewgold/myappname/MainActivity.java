@@ -314,6 +314,7 @@ public class MainActivity extends AppCompatActivity
     private FrameLayout adLayout;
     private WebAppInterface webAppInterface;
     private StepKingBridge stepKingBridge;
+    private DeepWorkBridge deepWorkBridge;
     private boolean offlineFileLoaded = false;
     private boolean isNotificationURL = false;
     private boolean extendediap = true;
@@ -855,6 +856,14 @@ public class MainActivity extends AppCompatActivity
             webView.addJavascriptInterface(stepKingBridge, "StepKing");
         } catch (Throwable t) {
             android.util.Log.e("MainActivity", "StepKingBridge init failed: " + t.getMessage());
+        }
+
+        // Deep Work - Screen focus tracking bridge
+        try {
+            deepWorkBridge = new DeepWorkBridge(this, webView);
+            webView.addJavascriptInterface(deepWorkBridge, "DeepWork");
+        } catch (Throwable t) {
+            android.util.Log.e("MainActivity", "DeepWorkBridge init failed: " + t.getMessage());
         }
 
         Context appContext = this;
@@ -2619,6 +2628,10 @@ public class MainActivity extends AppCompatActivity
 
     @Override
     public void onDestroy() {
+        // Clean up Deep Work bridge
+        if (deepWorkBridge != null) {
+            try { deepWorkBridge.onDestroy(); } catch (Exception e) {}
+        }
         webView.destroy();
         if (mAdView != null) {
             mAdView.destroy();
