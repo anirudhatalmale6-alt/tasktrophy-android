@@ -1680,6 +1680,14 @@ public class MainActivity extends AppCompatActivity
     public void onActivityResult(int requestCode, int resultCode, Intent intent) {
         super.onActivityResult(requestCode, resultCode, intent);
 
+        // Step King - Google Fit permission callback
+        if (requestCode == StepKingBridge.GOOGLE_FIT_PERMISSIONS_REQUEST_CODE) {
+            if (resultCode == RESULT_OK && stepKingBridge != null) {
+                stepKingBridge.onGoogleFitPermissionGranted();
+            }
+            return;
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             if (requestCode == REQUEST_SELECT_FILE) {
                 if (uploadMessage == null)
