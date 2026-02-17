@@ -850,8 +850,12 @@ public class MainActivity extends AppCompatActivity
         webView.addJavascriptInterface(new AndroidJSInterface(), "Android");
 
         // Add Step King bridge for Google Fit step + heart points tracking
-        stepKingBridge = new StepKingBridge(this, webView);
-        webView.addJavascriptInterface(stepKingBridge, "StepKing");
+        try {
+            stepKingBridge = new StepKingBridge(this, webView);
+            webView.addJavascriptInterface(stepKingBridge, "StepKing");
+        } catch (Throwable t) {
+            android.util.Log.e("MainActivity", "StepKingBridge init failed: " + t.getMessage());
+        }
 
         Context appContext = this;
 

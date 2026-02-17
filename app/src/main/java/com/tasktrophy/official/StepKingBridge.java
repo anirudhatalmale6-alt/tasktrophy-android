@@ -52,12 +52,19 @@ public class StepKingBridge {
     private long todaySteps = 0;
     private float todayHeartPoints = 0;
 
-    private static final FitnessOptions FITNESS_OPTIONS = FitnessOptions.builder()
-        .addDataType(DataType.TYPE_STEP_COUNT_DELTA, FitnessOptions.ACCESS_READ)
-        .addDataType(DataType.TYPE_HEART_POINTS, FitnessOptions.ACCESS_READ)
-        .addDataType(DataType.AGGREGATE_STEP_COUNT_DELTA, FitnessOptions.ACCESS_READ)
-        .addDataType(DataType.AGGREGATE_HEART_POINTS, FitnessOptions.ACCESS_READ)
-        .build();
+    private static FitnessOptions fitnessOptions;
+
+    private static FitnessOptions getFitnessOptions() {
+        if (fitnessOptions == null) {
+            fitnessOptions = FitnessOptions.builder()
+                .addDataType(DataType.TYPE_STEP_COUNT_DELTA, FitnessOptions.ACCESS_READ)
+                .addDataType(DataType.TYPE_HEART_POINTS, FitnessOptions.ACCESS_READ)
+                .addDataType(DataType.AGGREGATE_STEP_COUNT_DELTA, FitnessOptions.ACCESS_READ)
+                .addDataType(DataType.AGGREGATE_HEART_POINTS, FitnessOptions.ACCESS_READ)
+                .build();
+        }
+        return fitnessOptions;
+    }
 
     public StepKingBridge(Context context, WebView webView) {
         this.context = context;
@@ -116,8 +123,8 @@ public class StepKingBridge {
     @JavascriptInterface
     public boolean hasPermission() {
         try {
-            GoogleSignInAccount account = GoogleSignIn.getAccountForExtension(context, FITNESS_OPTIONS);
-            return GoogleSignIn.hasPermissions(account, FITNESS_OPTIONS);
+            GoogleSignInAccount account = GoogleSignIn.getAccountForExtension(context, getFitnessOptions());
+            return GoogleSignIn.hasPermissions(account, getFitnessOptions());
         } catch (Exception e) {
             return false;
         }
@@ -131,13 +138,13 @@ public class StepKingBridge {
         if (context instanceof Activity) {
             ((Activity) context).runOnUiThread(() -> {
                 try {
-                    GoogleSignInAccount account = GoogleSignIn.getAccountForExtension(context, FITNESS_OPTIONS);
-                    if (!GoogleSignIn.hasPermissions(account, FITNESS_OPTIONS)) {
+                    GoogleSignInAccount account = GoogleSignIn.getAccountForExtension(context, getFitnessOptions());
+                    if (!GoogleSignIn.hasPermissions(account, getFitnessOptions())) {
                         GoogleSignIn.requestPermissions(
                             (Activity) context,
                             GOOGLE_FIT_PERMISSIONS_REQUEST_CODE,
                             account,
-                            FITNESS_OPTIONS
+                            getFitnessOptions()
                         );
                     } else {
                         // Already have permission, refresh data
@@ -169,8 +176,8 @@ public class StepKingBridge {
 
         ((Activity) context).runOnUiThread(() -> {
             try {
-                GoogleSignInAccount account = GoogleSignIn.getAccountForExtension(context, FITNESS_OPTIONS);
-                if (!GoogleSignIn.hasPermissions(account, FITNESS_OPTIONS)) {
+                GoogleSignInAccount account = GoogleSignIn.getAccountForExtension(context, getFitnessOptions());
+                if (!GoogleSignIn.hasPermissions(account, getFitnessOptions())) {
                     callJsCallback(-1, "Google Fit permission not granted");
                     return;
                 }
@@ -208,8 +215,8 @@ public class StepKingBridge {
 
         ((Activity) context).runOnUiThread(() -> {
             try {
-                GoogleSignInAccount account = GoogleSignIn.getAccountForExtension(context, FITNESS_OPTIONS);
-                if (!GoogleSignIn.hasPermissions(account, FITNESS_OPTIONS)) {
+                GoogleSignInAccount account = GoogleSignIn.getAccountForExtension(context, getFitnessOptions());
+                if (!GoogleSignIn.hasPermissions(account, getFitnessOptions())) {
                     callJsHeartPoints(-1, "Google Fit permission not granted");
                     return;
                 }
