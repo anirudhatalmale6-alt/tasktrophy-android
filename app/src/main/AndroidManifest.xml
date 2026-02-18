@@ -7,11 +7,10 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <!--
- Uncomment the following section (beside section #2 bewlow) your application requires background location services (when `requireBackgroundLocation` is set to "true" in "Config.java") -
+    <!-- Background location + foreground service for Ghost Runner GPS race -->
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
-    -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.CAMERA" />
@@ -212,6 +211,10 @@
         <!-- <service android:name=".GPSService" -->
         <!-- android:exported="false" -->
         <!-- android:foregroundServiceType="location"/> -->
+        <service
+            android:name=".GhostRunnerService"
+            android:exported="false"
+            android:foregroundServiceType="location"/>
         <service
             android:name=".MyFirebaseMessagingService"
             android:exported="false">

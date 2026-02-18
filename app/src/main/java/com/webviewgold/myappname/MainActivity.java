@@ -315,6 +315,7 @@ public class MainActivity extends AppCompatActivity
     private WebAppInterface webAppInterface;
     private StepKingBridge stepKingBridge;
     private DeepWorkBridge deepWorkBridge;
+    private GhostRunnerBridge ghostRunnerBridge;
     private boolean offlineFileLoaded = false;
     private boolean isNotificationURL = false;
     private boolean extendediap = true;
@@ -864,6 +865,14 @@ public class MainActivity extends AppCompatActivity
             webView.addJavascriptInterface(deepWorkBridge, "DeepWork");
         } catch (Throwable t) {
             android.util.Log.e("MainActivity", "DeepWorkBridge init failed: " + t.getMessage());
+        }
+
+        // Ghost Runner - GPS race tracking bridge
+        try {
+            ghostRunnerBridge = new GhostRunnerBridge(this, webView);
+            webView.addJavascriptInterface(ghostRunnerBridge, "GhostRunner");
+        } catch (Throwable t) {
+            android.util.Log.e("MainActivity", "GhostRunnerBridge init failed: " + t.getMessage());
         }
 
         Context appContext = this;
@@ -2326,6 +2335,11 @@ public class MainActivity extends AppCompatActivity
             }
         }
 
+        // Forward to Ghost Runner bridge for GPS permission handling
+        if (ghostRunnerBridge != null) {
+            ghostRunnerBridge.onPermissionResult(requestCode, permissions, grantResults);
+        }
+
         if (requestCode == REQUEST_PERMISSION_STORAGE_CAMERA) {
             boolean isAllPermissionGranted = hasPermissions(this, permissions);
             if (isAllPermissionGranted) {
@@ -2631,6 +2645,10 @@ public class MainActivity extends AppCompatActivity
         // Clean up Deep Work bridge
         if (deepWorkBridge != null) {
             try { deepWorkBridge.onDestroy(); } catch (Exception e) {}
+        }
+        // Clean up Ghost Runner bridge
+        if (ghostRunnerBridge != null) {
+            try { ghostRunnerBridge.onDestroy(); } catch (Exception e) {}
         }
         webView.destroy();
         if (mAdView != null) {
