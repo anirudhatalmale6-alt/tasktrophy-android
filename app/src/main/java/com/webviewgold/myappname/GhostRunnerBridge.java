@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Build;
@@ -67,6 +68,29 @@ public class GhostRunnerBridge {
     // Time between location updates to consider valid (reject rapid-fire duplicates)
     private static final long MIN_TIME_BETWEEN_MS = 2000; // 2 seconds
 
+    // Steady pace detection
+    private static final int STEADY_PACE_WINDOW = 12;          // Number of qualifying points to check
+    private static final double STEADY_PACE_VARIANCE_PCT = 0.05; // 5% variance threshold
+    private static final long STEADY_PACE_MIN_SPAN_MS = 120000;  // Minimum 2 minutes span
+
+    // Known GPS spoofing app package names
+    private static final String[] KNOWN_SPOOF_APPS = {
+        "com.lexa.fakegps",
+        "com.incorporateapps.fakegps.fre",
+        "com.fakegps.mock",
+        "com.blogspot.newapphorizons.fakegps",
+        "com.lkr.fakelocation",
+        "com.evezzon.fakegps",
+        "com.theappninjas.gpsjoystick",
+        "com.incorporateapps.fakegps",
+        "ru.gavrikov.mocklocations",
+        "com.rosteam.gpsemulator",
+        "com.divi.fakeGPS",
+        "com.usefullapps.fakemylocation",
+        "com.gsmartstudio.fakegps",
+        "com.locationcheat.fakegps"
+    };
+
     private final Context context;
     private final WebView webView;
 
@@ -95,6 +119,14 @@ public class GhostRunnerBridge {
     private final float[] speedBuffer = new float[5];
     private int speedBufferIdx = 0;
     private int speedBufferCount = 0;
+
+    // Steady pace detection: stores speeds of last 12 qualifying GPS points
+    private final float[] steadyPaceSpeeds = new float[STEADY_PACE_WINDOW];
+    private final long[] steadyPaceTimestamps = new long[STEADY_PACE_WINDOW];
+    private int steadyPaceIdx = 0;
+    private int steadyPaceCount = 0;
+    private boolean steadyPaceWarning = false;
+    private boolean mockAppsDetected = false;
 
     // SharedPreferences keys
     private static final String KEY_DATE = "daily_date";
@@ -243,6 +275,10 @@ public class GhostRunnerBridge {
         speedBufferIdx = 0;
         speedBufferCount = 0;
         lastSyncedSeq = 0;
+        steadyPaceIdx = 0;
+        steadyPaceCount = 0;
+        steadyPaceWarning = false;
+        mockAppsDetected = false;
         breadcrumbs.clear();
     }
 
@@ -268,6 +304,124 @@ public class GhostRunnerBridge {
                    Math.sin(dLon / 2) * Math.sin(dLon / 2);
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return R * c;
+    }
+
+    // ─── Mock Location Detection ───
+
+    /**
+     * Check if developer mock location setting is enabled (pre-Android 6.0)
+     * or if any known GPS spoofing apps are installed (all Android versions).
+     */
+    @SuppressWarnings("deprecation")
+    private boolean checkMockLocationEnvironment() {
+        boolean suspicious = false;
+
+        // Check 1: Developer settings mock location (Android < 6.0 / API 23)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            try {
+                int mockEnabled = Settings.Secure.getInt(
+                    context.getContentResolver(),
+                    Settings.Secure.ALLOW_MOCK_LOCATION, 0
+                );
+                if (mockEnabled != 0) {
+                    Log.w(TAG, "Mock location setting is enabled in developer options");
+                    suspicious = true;
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error checking mock location setting: " + e.getMessage());
+            }
+        }
+
+        // Check 2: Scan for known GPS spoofing apps (all Android versions)
+        PackageManager pm = context.getPackageManager();
+        List<String> foundApps = new ArrayList<>();
+        for (String pkg : KNOWN_SPOOF_APPS) {
+            try {
+                pm.getPackageInfo(pkg, PackageManager.GET_ACTIVITIES);
+                foundApps.add(pkg);
+                suspicious = true;
+            } catch (PackageManager.NameNotFoundException e) {
+                // Not installed - expected
+            }
+        }
+
+        if (!foundApps.isEmpty()) {
+            Log.w(TAG, "GPS spoofing apps detected: " + foundApps);
+            mockAppsDetected = true;
+            try {
+                JSONObject warning = new JSONObject();
+                warning.put("warning", "mock_apps_detected");
+                warning.put("apps", new JSONArray(foundApps));
+                notifyJs("mockWarning", warning.toString());
+            } catch (Exception e) {
+                Log.e(TAG, "Error sending mock app warning: " + e.getMessage());
+            }
+        }
+
+        return suspicious;
+    }
+
+    // ─── Steady Pace Detection ───
+
+    /**
+     * Track speed of qualifying GPS points. If last 12 consecutive qualifying points
+     * spanning > 2 minutes have speed variance < 5%, flag as suspicious steady pace.
+     */
+    private void checkSteadyPace(float speedMs, long timestamp) {
+        // Store this qualifying point's speed
+        steadyPaceSpeeds[steadyPaceIdx] = speedMs;
+        steadyPaceTimestamps[steadyPaceIdx] = timestamp;
+        steadyPaceIdx = (steadyPaceIdx + 1) % STEADY_PACE_WINDOW;
+        if (steadyPaceCount < STEADY_PACE_WINDOW) steadyPaceCount++;
+
+        // Need full window to evaluate
+        if (steadyPaceCount < STEADY_PACE_WINDOW) return;
+
+        // Check time span: oldest to newest must be > 2 minutes
+        int oldestIdx = steadyPaceIdx; // wraps around, so current idx IS the oldest
+        int newestIdx = (steadyPaceIdx - 1 + STEADY_PACE_WINDOW) % STEADY_PACE_WINDOW;
+        long timeSpan = steadyPaceTimestamps[newestIdx] - steadyPaceTimestamps[oldestIdx];
+        if (timeSpan < STEADY_PACE_MIN_SPAN_MS) return;
+
+        // Calculate mean speed
+        float sum = 0;
+        for (int i = 0; i < STEADY_PACE_WINDOW; i++) {
+            sum += steadyPaceSpeeds[i];
+        }
+        float mean = sum / STEADY_PACE_WINDOW;
+
+        if (mean <= 0) return;
+
+        // Calculate variance as percentage of mean
+        float sumSquaredDiff = 0;
+        for (int i = 0; i < STEADY_PACE_WINDOW; i++) {
+            float diff = steadyPaceSpeeds[i] - mean;
+            sumSquaredDiff += diff * diff;
+        }
+        float variance = sumSquaredDiff / STEADY_PACE_WINDOW;
+        float stdDev = (float) Math.sqrt(variance);
+        float coeffOfVariation = stdDev / mean; // CV = stdDev / mean
+
+        if (coeffOfVariation < STEADY_PACE_VARIANCE_PCT) {
+            if (!steadyPaceWarning) {
+                steadyPaceWarning = true;
+                Log.w(TAG, "Steady pace detected: CV=" + (coeffOfVariation * 100) +
+                    "% across " + STEADY_PACE_WINDOW + " points over " + (timeSpan / 1000) + "s");
+                try {
+                    JSONObject warning = new JSONObject();
+                    warning.put("warning", "steady_pace");
+                    warning.put("coeffOfVariation", Math.round(coeffOfVariation * 10000) / 100.0);
+                    warning.put("meanSpeedKmh", Math.round(mean * 3.6 * 10) / 10.0);
+                    warning.put("timeSpanSeconds", timeSpan / 1000);
+                    notifyJs("mockWarning", warning.toString());
+                } catch (Exception e) {
+                    Log.e(TAG, "Error sending steady pace warning: " + e.getMessage());
+                }
+            }
+        } else {
+            // Reset flag if pace is no longer suspiciously steady
+            steadyPaceWarning = false;
+        }
     }
 
     // ─── Speed Smoothing ───
@@ -446,6 +600,11 @@ public class GhostRunnerBridge {
         );
         breadcrumbs.add(point);
 
+        // Steady pace detection: feed qualifying points into the detector
+        if (pointQualifies) {
+            checkSteadyPace(smoothedSpeed, timestamp);
+        }
+
         lastValidLocation = location;
         lastLocationTimeMs = timestamp;
 
@@ -506,9 +665,16 @@ public class GhostRunnerBridge {
         speedBufferIdx = 0;
         speedBufferCount = 0;
         currentSpeedMs = 0;
+        // Reset steady pace detection for new session
+        steadyPaceIdx = 0;
+        steadyPaceCount = 0;
+        steadyPaceWarning = false;
         // Clear lastValidLocation to avoid jump from last session's end point
         lastValidLocation = null;
         lastLocationTimeMs = 0;
+
+        // Check for mock location environment on each session start
+        checkMockLocationEnvironment();
 
         saveData();
         startGpsTracking();
@@ -631,6 +797,10 @@ public class GhostRunnerBridge {
             else if (speedKmh <= 25.0) speedZone = "too_fast";   // Driving suspect
             else speedZone = "flagged";                           // Vehicle
             info.put("speedZone", speedZone);
+
+            // Anti-cheat flags
+            info.put("steadyPaceWarning", steadyPaceWarning);
+            info.put("mockAppsDetected", mockAppsDetected);
 
             if (lastValidLocation != null) {
                 info.put("lastLat", lastValidLocation.getLatitude());

@@ -7,6 +7,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
@@ -17,6 +18,11 @@ import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 
 import org.json.JSONObject;
+
+import java.io.File;
+import java.util.Arrays;
+import java.util.List;
+import java.util.TimeZone;
 
 /**
  * Deep Work (Focus Duel) Bridge - Trial-Based Auto-Tracking
@@ -44,8 +50,32 @@ public class DeepWorkBridge {
     private static final String KEY_CURRENT_STREAK = "current_streak_minutes";
     private static final String KEY_TRIAL_STATE = "trial_state";
     private static final String KEY_TRIAL_COUNT = "trial_count";
+    private static final String KEY_TIMEZONE_OFFSET = "timezone_offset";
+    private static final String KEY_TIMEZONE_FLAGGED = "timezone_flagged";
 
     private static final int MAX_TRIALS_PER_DAY = 3;
+    private static final String EXPECTED_PACKAGE = "com.tasktrophy.official";
+
+    // Known app cloner package names
+    private static final List<String> CLONER_PACKAGES = Arrays.asList(
+        "com.lbe.parallel.intl",
+        "com.lbe.parallel.intl.arm64",
+        "com.excelliance.dualaid",
+        "com.parallel.space",
+        "com.parallel.space.lite",
+        "com.jumobile.multiapp",
+        "com.ludashi.dualspace",
+        "com.ludashi.superboost",
+        "com.polestar.multiaccount",
+        "com.cloneapp.dual",
+        "com.trigtech.privateme",
+        "com.nox.mopen.app",
+        "in.parallel.space",
+        "com.dual.space.clone",
+        "com.applisto.appcloner",
+        "com.oasisfeng.island",
+        "com.samsung.android.knox.containercore"
+    );
 
     // Trial states
     private static final String STATE_IDLE = "idle";
@@ -63,6 +93,8 @@ public class DeepWorkBridge {
     private long screenOffSince = 0;     // timestamp when screen turned off during FOCUSING
     private String trialState = STATE_IDLE;
     private int trialCount = 0;          // number of trials started today (may differ from unlocks if one is in progress)
+    private int savedTimezoneOffset = Integer.MIN_VALUE; // timezone offset at trial start (ms)
+    private boolean timezoneFlagged = false; // true if timezone changed during trial
 
     private BroadcastReceiver screenReceiver;
     private boolean receiverRegistered = false;
@@ -87,6 +119,8 @@ public class DeepWorkBridge {
             currentStreak = prefs.getInt(KEY_CURRENT_STREAK, 0);
             trialState = prefs.getString(KEY_TRIAL_STATE, STATE_IDLE);
             trialCount = prefs.getInt(KEY_TRIAL_COUNT, 0);
+            savedTimezoneOffset = prefs.getInt(KEY_TIMEZONE_OFFSET, Integer.MIN_VALUE);
+            timezoneFlagged = prefs.getBoolean(KEY_TIMEZONE_FLAGGED, false);
 
             // If we were FOCUSING and screen was off, recover elapsed time
             if (STATE_FOCUSING.equals(trialState) && screenOffSince > 0) {
@@ -119,6 +153,8 @@ public class DeepWorkBridge {
             screenOffSince = 0;
             trialState = STATE_IDLE;
             trialCount = 0;
+            savedTimezoneOffset = Integer.MIN_VALUE;
+            timezoneFlagged = false;
             prefs.edit()
                 .putInt(KEY_FOCUS_MINUTES, 0)
                 .putInt(KEY_LONGEST_STREAK, 0)
@@ -129,6 +165,8 @@ public class DeepWorkBridge {
                 .putString(KEY_SESSION_DATE, today)
                 .putString(KEY_TRIAL_STATE, STATE_IDLE)
                 .putInt(KEY_TRIAL_COUNT, 0)
+                .putInt(KEY_TIMEZONE_OFFSET, Integer.MIN_VALUE)
+                .putBoolean(KEY_TIMEZONE_FLAGGED, false)
                 .apply();
         }
     }
@@ -145,6 +183,8 @@ public class DeepWorkBridge {
             .putString(KEY_SESSION_DATE, java.time.LocalDate.now().toString())
             .putString(KEY_TRIAL_STATE, trialState)
             .putInt(KEY_TRIAL_COUNT, trialCount)
+            .putInt(KEY_TIMEZONE_OFFSET, savedTimezoneOffset)
+            .putBoolean(KEY_TIMEZONE_FLAGGED, timezoneFlagged)
             .apply();
     }
 
@@ -206,6 +246,9 @@ public class DeepWorkBridge {
 
     private void onScreenOff() {
         if (STATE_WAITING_FOR_LOCK.equals(trialState)) {
+            // Timezone check before starting focus
+            checkTimezoneIntegrity();
+
             // Transition: WAITING_FOR_LOCK -> FOCUSING
             trialState = STATE_FOCUSING;
             screenOffSince = System.currentTimeMillis();
@@ -261,9 +304,12 @@ public class DeepWorkBridge {
 
     private void onUserUnlock() {
         if (STATE_FOCUSING.equals(trialState)) {
+            // Check timezone integrity before recording time
+            checkTimezoneIntegrity();
+
             // Trial ends! Calculate earned minutes.
             int earnedMinutes = 0;
-            if (screenOffSince > 0) {
+            if (screenOffSince > 0 && !timezoneFlagged) {
                 long now = System.currentTimeMillis();
                 earnedMinutes = (int) ((now - screenOffSince) / 60000);
                 if (earnedMinutes > 0) {
@@ -273,6 +319,9 @@ public class DeepWorkBridge {
                         longestStreak = currentStreak;
                     }
                 }
+            } else if (timezoneFlagged) {
+                Log.w(TAG, "Timezone change detected! Trial time NOT counted.");
+                earnedMinutes = 0;
             }
 
             // Completed trial
@@ -314,12 +363,23 @@ public class DeepWorkBridge {
             return;
         }
 
+        // Anti-cheat: App cloner detection
+        if (isAppCloned()) {
+            Log.w(TAG, "startSession BLOCKED - app cloner detected!");
+            notifyJs("appCloned");
+            return;
+        }
+
         // Check daily trial limit
         if (trialCount >= MAX_TRIALS_PER_DAY) {
             Log.d(TAG, "startSession ignored - max trials reached (" + MAX_TRIALS_PER_DAY + ")");
             notifyJs("maxTrialsReached");
             return;
         }
+
+        // Record timezone offset at trial start
+        savedTimezoneOffset = TimeZone.getDefault().getRawOffset();
+        timezoneFlagged = false;
 
         trialState = STATE_WAITING_FOR_LOCK;
         sessionActive = true;
@@ -481,9 +541,131 @@ public class DeepWorkBridge {
             info.put("unlocks", unlocks); // completed trials
             info.put("model", Build.MODEL);
             info.put("manufacturer", Build.MANUFACTURER);
+            info.put("timezoneFlagged", timezoneFlagged);
+            info.put("timezoneOffset", TimeZone.getDefault().getRawOffset());
+            info.put("isCloned", isAppCloned());
             return info.toString();
         } catch (Exception e) {
             return "{}";
+        }
+    }
+
+    // ---- Timezone Lock ----
+
+    /**
+     * Checks if the timezone has changed since the trial started.
+     * If it has, flags the trial so focus time won't be counted.
+     */
+    private void checkTimezoneIntegrity() {
+        if (savedTimezoneOffset == Integer.MIN_VALUE) return; // no baseline recorded
+        int currentOffset = TimeZone.getDefault().getRawOffset();
+        if (currentOffset != savedTimezoneOffset) {
+            timezoneFlagged = true;
+            Log.w(TAG, "TIMEZONE CHANGE DETECTED! Was " + savedTimezoneOffset + "ms, now " + currentOffset + "ms. Trial flagged.");
+            saveData();
+            notifyJs("timezoneCheat");
+        }
+    }
+
+    /**
+     * Returns a warning message if timezone was changed during the trial.
+     * Returns empty string if no issue.
+     */
+    @JavascriptInterface
+    public String getTimezoneWarning() {
+        if (timezoneFlagged) {
+            return "Timezone change detected during focus session. This trial's time was not counted.";
+        }
+        return "";
+    }
+
+    /**
+     * Returns the current timezone offset in milliseconds.
+     */
+    @JavascriptInterface
+    public int getTimezoneOffset() {
+        return TimeZone.getDefault().getRawOffset();
+    }
+
+    // ---- App Cloner Detection ----
+
+    /**
+     * Detects if the app is running inside a cloned/dual-space environment.
+     * Checks: package name mismatch, unusual data paths, known cloner apps installed.
+     */
+    @JavascriptInterface
+    public boolean isAppCloned() {
+        try {
+            // Check 1: Package name doesn't match expected
+            String currentPackage = context.getPackageName();
+            if (!EXPECTED_PACKAGE.equals(currentPackage)) {
+                Log.w(TAG, "Package name mismatch: " + currentPackage + " != " + EXPECTED_PACKAGE);
+                return true;
+            }
+
+            // Check 2: Data directory contains clone-related paths
+            String dataDir = context.getApplicationInfo().dataDir;
+            if (dataDir != null) {
+                String lowerDataDir = dataDir.toLowerCase();
+                if (lowerDataDir.contains("clone") ||
+                    lowerDataDir.contains("dual") ||
+                    lowerDataDir.contains("parallel") ||
+                    lowerDataDir.contains("dualspace") ||
+                    lowerDataDir.contains("multi") ||
+                    lowerDataDir.contains("island") ||
+                    lowerDataDir.contains("privateme") ||
+                    lowerDataDir.contains("999")) {  // some cloners use user 999
+                    Log.w(TAG, "Suspicious data directory: " + dataDir);
+                    return true;
+                }
+
+                // Check for non-standard user ID in path (cloned apps run under different user)
+                // Normal: /data/data/com.package or /data/user/0/com.package
+                // Cloned: /data/user/10/com.package or /data/user/999/com.package
+                if (dataDir.contains("/data/user/")) {
+                    try {
+                        String afterUser = dataDir.substring(dataDir.indexOf("/data/user/") + 11);
+                        String userIdStr = afterUser.substring(0, afterUser.indexOf('/'));
+                        int userId = Integer.parseInt(userIdStr);
+                        if (userId > 0) {
+                            Log.w(TAG, "Running under non-primary user ID: " + userId + " (path: " + dataDir + ")");
+                            return true;
+                        }
+                    } catch (Exception e) {
+                        // parsing error, ignore
+                    }
+                }
+            }
+
+            // Check 3: Known cloner apps installed on device
+            PackageManager pm = context.getPackageManager();
+            for (String clonerPkg : CLONER_PACKAGES) {
+                try {
+                    pm.getPackageInfo(clonerPkg, 0);
+                    Log.w(TAG, "Known cloner app installed: " + clonerPkg);
+                    // Don't return true just for having the app installed -
+                    // only flag if combined with other signals
+                    // But we log it for awareness
+                } catch (PackageManager.NameNotFoundException e) {
+                    // Not installed, good
+                }
+            }
+
+            // Check 4: Multiple instances detection via files directory
+            File filesDir = context.getFilesDir();
+            if (filesDir != null) {
+                String filesPath = filesDir.getAbsolutePath().toLowerCase();
+                if (filesPath.contains("clone") || filesPath.contains("parallel") ||
+                    filesPath.contains("dual") || filesPath.contains("multi")) {
+                    Log.w(TAG, "Suspicious files directory: " + filesPath);
+                    return true;
+                }
+            }
+
+            return false;
+        } catch (Exception e) {
+            Log.e(TAG, "Error in cloner detection: " + e.getMessage());
+            return false; // fail open - don't block legitimate users on error
         }
     }
 
