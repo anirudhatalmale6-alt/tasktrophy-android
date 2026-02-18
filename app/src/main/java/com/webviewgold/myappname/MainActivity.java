@@ -316,6 +316,7 @@ public class MainActivity extends AppCompatActivity
     private StepKingBridge stepKingBridge;
     private DeepWorkBridge deepWorkBridge;
     private GhostRunnerBridge ghostRunnerBridge;
+    private SleepTrackerBridge sleepTrackerBridge;
     private boolean offlineFileLoaded = false;
     private boolean isNotificationURL = false;
     private boolean extendediap = true;
@@ -873,6 +874,14 @@ public class MainActivity extends AppCompatActivity
             webView.addJavascriptInterface(ghostRunnerBridge, "GhostRunner");
         } catch (Throwable t) {
             android.util.Log.e("MainActivity", "GhostRunnerBridge init failed: " + t.getMessage());
+        }
+
+        // Sleep Tracker - sleep discipline tracking bridge
+        try {
+            sleepTrackerBridge = new SleepTrackerBridge(this, webView);
+            webView.addJavascriptInterface(sleepTrackerBridge, "SleepTracker");
+        } catch (Throwable t) {
+            android.util.Log.e("MainActivity", "SleepTrackerBridge init failed: " + t.getMessage());
         }
 
         Context appContext = this;
@@ -2649,6 +2658,10 @@ public class MainActivity extends AppCompatActivity
         // Clean up Ghost Runner bridge
         if (ghostRunnerBridge != null) {
             try { ghostRunnerBridge.onDestroy(); } catch (Exception e) {}
+        }
+        // Clean up Sleep Tracker bridge
+        if (sleepTrackerBridge != null) {
+            try { sleepTrackerBridge.onDestroy(); } catch (Exception e) {}
         }
         webView.destroy();
         if (mAdView != null) {
