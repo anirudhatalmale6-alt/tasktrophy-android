@@ -40,7 +40,9 @@
 
     <!--AdMob IDs-->
     <string name="admob_app_id" translatable="false">ca-app-pub-6353903215132082~5351020639</string>
-    <string name="admob_rewarded_id" translatable="false">ca-app-pub-6353903215132082/9354694881</string>
+    <!-- TEST rewarded ad unit (always returns ads) - switch back to real ID for production -->
+    <!-- Real ID: ca-app-pub-6353903215132082/9354694881 -->
+    <string name="admob_rewarded_id" translatable="false">ca-app-pub-3940256099942544/5224354917</string>
     <string name="banner_footer" translatable="false">ca-app-pub-6353903215132082/3797092354</string>
     <string name="interstitial_full_screen" translatable="false">ca-app-pub-6353903215132082/1113242780</string>
 
