@@ -268,8 +268,8 @@ public class Config {
     //Set to "true" if you want to display AdMob banner ads (DISABLED - use Android.showBanner() from JS)
     public static final boolean SHOW_BANNER_AD = false;
 
-    //Set to "true" if you want to display AdMob fullscreen interstitial ads (DISABLED - use Android.showInterstitial() from JS)
-    public static final boolean SHOW_FULL_SCREEN_AD = false;
+    //Set to "true" to enable AdMob SDK initialization (required for JS-controlled ads)
+    public static final boolean SHOW_FULL_SCREEN_AD = true;
 
     //Set to "false" if you want to deactivate Google consent management for AdMob
     public static final boolean ASK_FOR_AD_CONSENT = true;
