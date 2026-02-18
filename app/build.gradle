@@ -14,8 +14,8 @@ android {
         applicationId "com.tasktrophy.official"
         minSdk 23
         targetSdk 35
-        versionCode 31
-        versionName "3.5"
+        versionCode 32
+        versionName "3.5.1"
         multiDexEnabled true
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders = [

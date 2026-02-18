@@ -221,44 +221,24 @@ public class StepKingBridge {
                     return;
                 }
 
-                long startTime = getStartOfDayMillis();
-                long endTime = System.currentTimeMillis();
-
-                DataReadRequest readRequest = new DataReadRequest.Builder()
-                    .read(DataType.TYPE_STEP_COUNT_DELTA)
-                    .setTimeRange(startTime, endTime, TimeUnit.MILLISECONDS)
-                    .enableServerQueries()
-                    .build();
-
+                // Primary: Use readDailyTotal (works without ACTIVITY_RECOGNITION permission)
                 Fitness.getHistoryClient((Activity) context, account)
-                    .readData(readRequest)
-                    .addOnSuccessListener(response -> {
-                        long validSteps = 0;
-                        long manualStepsLocal = 0;
-
-                        for (DataSet dataSet : response.getDataSets()) {
-                            for (DataPoint dp : dataSet.getDataPoints()) {
-                                int stepVal = dp.getValue(Field.FIELD_STEPS).asInt();
-                                if (isManualEntry(dp)) {
-                                    manualStepsLocal += stepVal;
-                                    Log.d(TAG, "FILTERED manual steps: " + stepVal
-                                        + " from " + dp.getOriginalDataSource());
-                                } else {
-                                    validSteps += stepVal;
-                                }
-                            }
+                    .readDailyTotal(DataType.TYPE_STEP_COUNT_DELTA)
+                    .addOnSuccessListener(dataSet -> {
+                        long totalSteps = 0;
+                        if (!dataSet.isEmpty()) {
+                            totalSteps = dataSet.getDataPoints().get(0)
+                                .getValue(Field.FIELD_STEPS).asInt();
                         }
+                        Log.d(TAG, "Google Fit daily total steps: " + totalSteps);
 
-                        manualSteps = manualStepsLocal;
-                        saveData(validSteps, todayHeartPoints);
-                        callJsCallback(validSteps, null);
-                        Log.d(TAG, "Google Fit steps (valid): " + validSteps
-                            + ", manual (filtered out): " + manualSteps);
+                        // Save total steps (we'll subtract manual if detected later)
+                        final long stepsFromTotal = totalSteps;
+                        saveData(stepsFromTotal, todayHeartPoints);
+                        callJsCallback(stepsFromTotal, null);
 
-                        // Notify frontend if manual entries were detected
-                        if (manualSteps > 0) {
-                            callJsManualEntryDetected();
-                        }
+                        // Secondary: Try History API for manual detection (may fail without ACTIVITY_RECOGNITION)
+                        tryDetectManualSteps(account, stepsFromTotal);
                     })
                     .addOnFailureListener(e -> {
                         Log.e(TAG, "Failed to read steps: " + e.getMessage());
@@ -269,6 +249,65 @@ public class StepKingBridge {
                 callJsCallback(-1, e.getMessage());
             }
         });
+    }
+
+    /**
+     * Secondary check: tries History API to detect manual entries.
+     * If this fails (e.g. no ACTIVITY_RECOGNITION permission), we silently ignore.
+     * If manual entries found, we recalculate valid steps and notify frontend.
+     */
+    private void tryDetectManualSteps(GoogleSignInAccount account, long totalFromDailyRead) {
+        if (!(context instanceof Activity)) return;
+
+        try {
+            long startTime = getStartOfDayMillis();
+            long endTime = System.currentTimeMillis();
+
+            DataReadRequest readRequest = new DataReadRequest.Builder()
+                .read(DataType.TYPE_STEP_COUNT_DELTA)
+                .setTimeRange(startTime, endTime, TimeUnit.MILLISECONDS)
+                .enableServerQueries()
+                .build();
+
+            Fitness.getHistoryClient((Activity) context, account)
+                .readData(readRequest)
+                .addOnSuccessListener(response -> {
+                    long validSteps = 0;
+                    long manualStepsLocal = 0;
+
+                    for (DataSet dataSet : response.getDataSets()) {
+                        for (DataPoint dp : dataSet.getDataPoints()) {
+                            int stepVal = dp.getValue(Field.FIELD_STEPS).asInt();
+                            if (isManualEntry(dp)) {
+                                manualStepsLocal += stepVal;
+                                Log.d(TAG, "FILTERED manual steps: " + stepVal
+                                    + " from " + dp.getOriginalDataSource());
+                            } else {
+                                validSteps += stepVal;
+                            }
+                        }
+                    }
+
+                    manualSteps = manualStepsLocal;
+
+                    if (manualStepsLocal > 0) {
+                        // Recalculate: use filtered count from History API
+                        saveData(validSteps, todayHeartPoints);
+                        callJsCallback(validSteps, null);
+                        callJsManualEntryDetected();
+                        Log.d(TAG, "Manual steps detected: " + manualStepsLocal
+                            + ", valid: " + validSteps);
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    // History API failed (likely missing ACTIVITY_RECOGNITION permission)
+                    // Silently ignore - readDailyTotal data is already shown
+                    Log.w(TAG, "History API for manual detection failed (expected if no ACTIVITY_RECOGNITION): "
+                        + e.getMessage());
+                });
+        } catch (Exception e) {
+            Log.w(TAG, "tryDetectManualSteps error: " + e.getMessage());
+        }
     }
 
     @JavascriptInterface
@@ -283,45 +322,23 @@ public class StepKingBridge {
                     return;
                 }
 
-                long startTime = getStartOfDayMillis();
-                long endTime = System.currentTimeMillis();
-
-                DataReadRequest readRequest = new DataReadRequest.Builder()
-                    .read(DataType.TYPE_HEART_POINTS)
-                    .setTimeRange(startTime, endTime, TimeUnit.MILLISECONDS)
-                    .enableServerQueries()
-                    .build();
-
+                // Primary: Use readDailyTotal (works without ACTIVITY_RECOGNITION permission)
                 Fitness.getHistoryClient((Activity) context, account)
-                    .readData(readRequest)
-                    .addOnSuccessListener(response -> {
-                        float validPoints = 0;
-                        float manualPointsLocal = 0;
-
-                        for (DataSet dataSet : response.getDataSets()) {
-                            for (DataPoint dp : dataSet.getDataPoints()) {
-                                float pointVal = dp.getValue(Field.FIELD_INTENSITY).asFloat();
-                                if (isManualEntry(dp)) {
-                                    manualPointsLocal += pointVal;
-                                    Log.d(TAG, "FILTERED manual heart points: " + pointVal
-                                        + " from " + dp.getOriginalDataSource());
-                                } else {
-                                    validPoints += pointVal;
-                                }
-                            }
+                    .readDailyTotal(DataType.TYPE_HEART_POINTS)
+                    .addOnSuccessListener(dataSet -> {
+                        float totalPoints = 0;
+                        if (!dataSet.isEmpty()) {
+                            totalPoints = dataSet.getDataPoints().get(0)
+                                .getValue(Field.FIELD_INTENSITY).asFloat();
                         }
+                        Log.d(TAG, "Google Fit daily total heart points: " + totalPoints);
 
-                        manualHeartPoints = manualPointsLocal;
-                        todayHeartPoints = validPoints;
-                        saveData(todaySteps, validPoints);
-                        callJsHeartPoints(validPoints, null);
-                        Log.d(TAG, "Google Fit heart points (valid): " + validPoints
-                            + ", manual (filtered out): " + manualHeartPoints);
+                        todayHeartPoints = totalPoints;
+                        saveData(todaySteps, totalPoints);
+                        callJsHeartPoints(totalPoints, null);
 
-                        // Notify frontend if manual entries were detected
-                        if (manualHeartPoints > 0) {
-                            callJsManualEntryDetected();
-                        }
+                        // Secondary: Try History API for manual detection
+                        tryDetectManualHeartPoints(account, totalPoints);
                     })
                     .addOnFailureListener(e -> {
                         Log.e(TAG, "Failed to read heart points: " + e.getMessage());
@@ -332,6 +349,62 @@ public class StepKingBridge {
                 callJsHeartPoints(-1, e.getMessage());
             }
         });
+    }
+
+    /**
+     * Secondary check: tries History API to detect manual heart point entries.
+     * If this fails (e.g. no ACTIVITY_RECOGNITION permission), we silently ignore.
+     */
+    private void tryDetectManualHeartPoints(GoogleSignInAccount account, float totalFromDailyRead) {
+        if (!(context instanceof Activity)) return;
+
+        try {
+            long startTime = getStartOfDayMillis();
+            long endTime = System.currentTimeMillis();
+
+            DataReadRequest readRequest = new DataReadRequest.Builder()
+                .read(DataType.TYPE_HEART_POINTS)
+                .setTimeRange(startTime, endTime, TimeUnit.MILLISECONDS)
+                .enableServerQueries()
+                .build();
+
+            Fitness.getHistoryClient((Activity) context, account)
+                .readData(readRequest)
+                .addOnSuccessListener(response -> {
+                    float validPoints = 0;
+                    float manualPointsLocal = 0;
+
+                    for (DataSet dataSet : response.getDataSets()) {
+                        for (DataPoint dp : dataSet.getDataPoints()) {
+                            float pointVal = dp.getValue(Field.FIELD_INTENSITY).asFloat();
+                            if (isManualEntry(dp)) {
+                                manualPointsLocal += pointVal;
+                                Log.d(TAG, "FILTERED manual heart points: " + pointVal
+                                    + " from " + dp.getOriginalDataSource());
+                            } else {
+                                validPoints += pointVal;
+                            }
+                        }
+                    }
+
+                    manualHeartPoints = manualPointsLocal;
+
+                    if (manualPointsLocal > 0) {
+                        // Recalculate: use filtered count
+                        todayHeartPoints = validPoints;
+                        saveData(todaySteps, validPoints);
+                        callJsHeartPoints(validPoints, null);
+                        callJsManualEntryDetected();
+                        Log.d(TAG, "Manual heart points detected: " + manualPointsLocal
+                            + ", valid: " + validPoints);
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.w(TAG, "History API for manual HP detection failed: " + e.getMessage());
+                });
+        } catch (Exception e) {
+            Log.w(TAG, "tryDetectManualHeartPoints error: " + e.getMessage());
+        }
     }
 
     @JavascriptInterface
