@@ -1,12 +1,15 @@
 package com.webviewgold.myappname;
 
 import android.app.Activity;
+import android.app.KeyguardManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.PowerManager;
 import android.provider.Settings;
 import android.util.Log;
@@ -225,13 +228,34 @@ public class DeepWorkBridge {
     }
 
     private void onScreenOn() {
-        // Screen on alone does NOT end the trial.
-        // We wait for USER_PRESENT (actual unlock) to finalize.
-        // But we can calculate pending time for display purposes.
         if (STATE_FOCUSING.equals(trialState) && screenOffSince > 0) {
-            Log.d(TAG, "Screen ON during FOCUSING - waiting for USER_PRESENT to finalize");
+            Log.d(TAG, "Screen ON during FOCUSING - checking if device is unlocked");
             // Notify JS so UI can show pending minutes update
             notifyJs("screenOn");
+
+            // ACTION_USER_PRESENT doesn't fire on all devices (especially with no lock screen).
+            // Use a delayed check: if the keyguard is not locked after a short delay,
+            // the user has unlocked and we should end the trial.
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                if (!STATE_FOCUSING.equals(trialState)) return; // Already ended by USER_PRESENT
+
+                KeyguardManager km = (KeyguardManager) context.getSystemService(Context.KEYGUARD_SERVICE);
+                boolean deviceLocked = false;
+                if (km != null) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
+                        deviceLocked = km.isDeviceLocked();
+                    } else {
+                        deviceLocked = km.isKeyguardLocked();
+                    }
+                }
+
+                if (!deviceLocked) {
+                    Log.d(TAG, "Keyguard not locked after screen on - ending trial (USER_PRESENT fallback)");
+                    onUserUnlock();
+                } else {
+                    Log.d(TAG, "Keyguard still locked - waiting for USER_PRESENT");
+                }
+            }, 1500); // 1.5 second delay to allow keyguard to settle
         }
     }
 
@@ -410,6 +434,25 @@ public class DeepWorkBridge {
     @JavascriptInterface
     public int getRemainingTrials() {
         return Math.max(0, MAX_TRIALS_PER_DAY - trialCount);
+    }
+
+    /**
+     * Called from frontend when the page becomes visible (user is viewing the app).
+     * If we're stuck in FOCUSING while the screen is clearly on, end the trial.
+     * This is a safety net for devices where ACTION_USER_PRESENT doesn't fire.
+     */
+    @JavascriptInterface
+    public void checkTrialState() {
+        if (STATE_FOCUSING.equals(trialState)) {
+            PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+            if (pm != null && pm.isInteractive()) {
+                // Screen is on and user is viewing the app - they've definitely unlocked
+                Log.d(TAG, "checkTrialState: Screen is on during FOCUSING - ending trial (JS fallback)");
+                if (context instanceof Activity) {
+                    ((Activity) context).runOnUiThread(() -> onUserUnlock());
+                }
+            }
+        }
     }
 
     @JavascriptInterface
