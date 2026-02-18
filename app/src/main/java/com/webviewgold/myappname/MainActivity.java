@@ -2349,6 +2349,18 @@ public class MainActivity extends AppCompatActivity
             ghostRunnerBridge.onPermissionResult(requestCode, permissions, grantResults);
         }
 
+        // ACTIVITY_RECOGNITION permission for Step King manual entry detection
+        if (requestCode == StepKingBridge.ACTIVITY_RECOGNITION_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Log.d("MainActivity", "ACTIVITY_RECOGNITION permission granted");
+                if (stepKingBridge != null) {
+                    stepKingBridge.onActivityRecognitionGranted();
+                }
+            } else {
+                Log.w("MainActivity", "ACTIVITY_RECOGNITION permission denied - manual entry detection unavailable");
+            }
+        }
+
         if (requestCode == REQUEST_PERMISSION_STORAGE_CAMERA) {
             boolean isAllPermissionGranted = hasPermissions(this, permissions);
             if (isAllPermissionGranted) {

@@ -1,13 +1,18 @@
 package com.webviewgold.myappname;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.provider.Settings;
 import android.util.Log;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
+
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
@@ -42,6 +47,7 @@ public class StepKingBridge {
     private static final String KEY_MANUAL_HEART = "manual_heart_today";
 
     public static final int GOOGLE_FIT_PERMISSIONS_REQUEST_CODE = 9002;
+    public static final int ACTIVITY_RECOGNITION_REQUEST_CODE = 9003;
 
     private static final String GOOGLE_FIT_PACKAGE = "com.google.android.apps.fitness";
 
@@ -252,12 +258,56 @@ public class StepKingBridge {
     }
 
     /**
+     * Checks if ACTIVITY_RECOGNITION permission is granted (required on Android 10+).
+     */
+    private boolean hasActivityRecognitionPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            return ContextCompat.checkSelfPermission(context,
+                Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED;
+        }
+        return true; // Not needed below Android 10
+    }
+
+    /**
+     * Requests ACTIVITY_RECOGNITION runtime permission (Android 10+).
+     * After granted, call refreshSteps() to retry manual detection.
+     */
+    @JavascriptInterface
+    public void requestActivityRecognition() {
+        if (context instanceof Activity && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ((Activity) context).runOnUiThread(() -> {
+                ActivityCompat.requestPermissions((Activity) context,
+                    new String[]{Manifest.permission.ACTIVITY_RECOGNITION},
+                    ACTIVITY_RECOGNITION_REQUEST_CODE);
+            });
+        }
+    }
+
+    /**
+     * Called from MainActivity when ACTIVITY_RECOGNITION permission is granted.
+     * Re-runs manual detection that previously failed.
+     */
+    public void onActivityRecognitionGranted() {
+        Log.d(TAG, "ACTIVITY_RECOGNITION granted - retrying manual detection");
+        refreshSteps();
+        getHeartPoints();
+    }
+
+    /**
      * Secondary check: tries History API to detect manual entries.
-     * If this fails (e.g. no ACTIVITY_RECOGNITION permission), we silently ignore.
-     * If manual entries found, we recalculate valid steps and notify frontend.
+     * Requires ACTIVITY_RECOGNITION permission on Android 10+ for step data.
+     * If permission not granted, requests it. If manual entries found, recalculates
+     * valid steps and notifies frontend.
      */
     private void tryDetectManualSteps(GoogleSignInAccount account, long totalFromDailyRead) {
         if (!(context instanceof Activity)) return;
+
+        // Check ACTIVITY_RECOGNITION permission first (required for step History API on Android 10+)
+        if (!hasActivityRecognitionPermission()) {
+            Log.w(TAG, "ACTIVITY_RECOGNITION permission not granted - requesting it");
+            requestActivityRecognition();
+            return;
+        }
 
         try {
             long startTime = getStartOfDayMillis();
