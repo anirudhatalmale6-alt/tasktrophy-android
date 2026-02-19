@@ -9,7 +9,7 @@ import androidx.annotation.NonNull;
 import androidx.health.connect.client.HealthConnectClient;
 import androidx.health.connect.client.records.StepsRecord;
 import androidx.health.connect.client.request.AggregateRequest;
-import androidx.health.connect.client.response.AggregationResult;
+import androidx.health.connect.client.aggregate.AggregationResult;
 import androidx.health.connect.client.time.TimeRangeFilter;
 import androidx.work.Constraints;
 import androidx.work.ExistingPeriodicWorkPolicy;

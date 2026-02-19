@@ -20,7 +20,7 @@ import androidx.health.connect.client.records.StepsRecord;
 import androidx.health.connect.client.records.metadata.DataOrigin;
 import androidx.health.connect.client.request.AggregateRequest;
 import androidx.health.connect.client.request.ReadRecordsRequest;
-import androidx.health.connect.client.response.AggregationResult;
+import androidx.health.connect.client.aggregate.AggregationResult;
 import androidx.health.connect.client.response.ReadRecordsResponse;
 import androidx.health.connect.client.time.TimeRangeFilter;
 
