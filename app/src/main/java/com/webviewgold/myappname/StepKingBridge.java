@@ -274,6 +274,7 @@ public class StepKingBridge {
     /**
      * Reads today's heart rate data from Health Connect and calculates heart points.
      * Moderate (BPM > 100): 1 pt/min, Vigorous (BPM > 130): 2 pts/min.
+     * Fallback: if no heart rate data, calculates from steps (1 pt per 1000 steps).
      */
     @JavascriptInterface
     public void getHeartPoints() {
@@ -289,52 +290,96 @@ public class StepKingBridge {
 
                 Log.d(TAG, "Reading heart rate from Health Connect: " + startTime + " to " + endTime);
 
-                ReadRecordsRequest<HeartRateRecord> readRequest = new ReadRecordsRequest<>(
-                    HR_KCLASS,
-                    TimeRangeFilter.between(startTime, endTime),
-                    new HashSet<>(),
-                    true,
-                    1000,
-                    null
-                );
+                // Try heart rate data first
+                float heartRatePoints = 0;
+                boolean hasHeartRateData = false;
 
-                @SuppressWarnings("unchecked")
-                ReadRecordsResponse<HeartRateRecord> response = (ReadRecordsResponse<HeartRateRecord>) BuildersKt.runBlocking(
-                    EmptyCoroutineContext.INSTANCE,
-                    (scope, continuation) -> healthConnectClient.readRecords(readRequest, continuation)
-                );
+                try {
+                    ReadRecordsRequest<HeartRateRecord> readRequest = new ReadRecordsRequest<>(
+                        HR_KCLASS,
+                        TimeRangeFilter.between(startTime, endTime),
+                        new HashSet<>(),
+                        true,
+                        1000,
+                        null
+                    );
 
-                float totalPoints = 0;
+                    @SuppressWarnings("unchecked")
+                    ReadRecordsResponse<HeartRateRecord> response = (ReadRecordsResponse<HeartRateRecord>) BuildersKt.runBlocking(
+                        EmptyCoroutineContext.INSTANCE,
+                        (scope, continuation) -> healthConnectClient.readRecords(readRequest, continuation)
+                    );
 
-                for (HeartRateRecord record : response.getRecords()) {
-                    long durationMs = record.getEndTime().toEpochMilli() - record.getStartTime().toEpochMilli();
-                    float durationMins = durationMs / 60000f;
+                    for (HeartRateRecord record : response.getRecords()) {
+                        long durationMs = record.getEndTime().toEpochMilli() - record.getStartTime().toEpochMilli();
+                        float durationMins = durationMs / 60000f;
 
-                    List<HeartRateRecord.Sample> samples = record.getSamples();
-                    if (samples.isEmpty()) continue;
+                        List<HeartRateRecord.Sample> samples = record.getSamples();
+                        if (samples.isEmpty()) continue;
 
-                    long totalBpm = 0;
-                    for (HeartRateRecord.Sample sample : samples) {
-                        totalBpm += sample.getBeatsPerMinute();
+                        hasHeartRateData = true;
+                        long totalBpm = 0;
+                        for (HeartRateRecord.Sample sample : samples) {
+                            totalBpm += sample.getBeatsPerMinute();
+                        }
+                        float avgBpm = (float) totalBpm / samples.size();
+
+                        if (avgBpm > 130) {
+                            heartRatePoints += durationMins * 2;
+                        } else if (avgBpm > 100) {
+                            heartRatePoints += durationMins;
+                        }
                     }
-                    float avgBpm = (float) totalBpm / samples.size();
 
-                    if (avgBpm > 130) {
-                        totalPoints += durationMins * 2;
-                    } else if (avgBpm > 100) {
-                        totalPoints += durationMins;
+                    Log.d(TAG, "Heart rate records: " + response.getRecords().size() +
+                        ", heart rate points: " + heartRatePoints);
+                } catch (Exception e) {
+                    Log.w(TAG, "Heart rate read failed, will use step fallback: " + e.getMessage());
+                }
+
+                float totalPoints = heartRatePoints;
+
+                // Fallback: if no heart rate data, calculate from steps
+                // 1 heart point per 1000 steps (walking is moderate activity)
+                if (!hasHeartRateData || heartRatePoints < 0.1f) {
+                    try {
+                        AggregateRequest stepsRequest = new AggregateRequest(
+                            new HashSet<>(Arrays.asList(StepsRecord.COUNT_TOTAL)),
+                            TimeRangeFilter.between(startTime, endTime),
+                            new HashSet<>()
+                        );
+
+                        AggregationResult stepsResult = (AggregationResult) BuildersKt.runBlocking(
+                            EmptyCoroutineContext.INSTANCE,
+                            (scope, continuation) -> healthConnectClient.aggregate(stepsRequest, continuation)
+                        );
+
+                        Long stepCount = stepsResult.get(StepsRecord.COUNT_TOTAL);
+                        long steps = (stepCount != null) ? stepCount : 0;
+
+                        // 1 heart point per 1000 steps (walking activity)
+                        float stepPoints = steps / 1000f;
+                        totalPoints = Math.max(totalPoints, stepPoints);
+
+                        Log.d(TAG, "Step-based heart points fallback: " + steps +
+                            " steps = " + stepPoints + " pts");
+                    } catch (Exception e) {
+                        Log.w(TAG, "Step fallback also failed: " + e.getMessage());
                     }
                 }
 
-                Log.d(TAG, "Health Connect heart points: " + totalPoints +
-                    " (records: " + response.getRecords().size() + ")");
+                // Round to 1 decimal
+                totalPoints = Math.round(totalPoints * 10f) / 10f;
+
+                Log.d(TAG, "Final heart points: " + totalPoints +
+                    " (hasHeartRate=" + hasHeartRateData + ")");
 
                 saveHeartPoints(totalPoints);
                 callJsHeartPoints(totalPoints, null);
 
             } catch (Exception e) {
-                Log.e(TAG, "Failed to read heart rate: " + e.getMessage(), e);
-                callJsHeartPoints(-1, "Failed to read heart rate: " + e.getMessage());
+                Log.e(TAG, "Failed to calculate heart points: " + e.getMessage(), e);
+                callJsHeartPoints(-1, "Failed to calculate heart points: " + e.getMessage());
             }
         }, "HC-HeartRate").start();
     }
