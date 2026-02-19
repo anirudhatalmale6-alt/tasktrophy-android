@@ -5,12 +5,8 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <!-- Background location + foreground service for Ghost Runner GPS race -->
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!-- Location permissions removed - Ghost Runner now uses Health Connect distance, not GPS -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.CAMERA" />
@@ -238,10 +234,8 @@
             </intent-filter>
         </activity-alias>
 
-        <service
-            android:name=".GhostRunnerService"
-            android:exported="false"
-            android:foregroundServiceType="location"/>
+        <!-- GhostRunnerService removed - no longer using GPS, now Health Connect -->
+
         <service
             android:name=".MyFirebaseMessagingService"
             android:exported="false">

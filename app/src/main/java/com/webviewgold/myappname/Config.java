@@ -343,8 +343,8 @@ public class Config {
     /**
      * Android Permission Options
      */
-    static boolean requireLocation = true; //Set to "false" if you do NOT require location services/GPS coordinates; don't forget to also remove relevant entries in AndroidManifest.xml if you want to ensure the complete removal of the permission capability for the app
-    static boolean requireBackgroundLocation = true; //Set to "true" if background (!) location services are also needed (also, ensure that you also uncomment the "android.permission.FOREGROUND_SERVICE_LOCATION" and ".GPSService" blocks in AndroidManifest.xml; search for these terms within); this setting is working only if "requireLocation" is also set to "true"
+    static boolean requireLocation = false; //Location disabled - Ghost Runner uses Health Connect distance, not GPS
+    static boolean requireBackgroundLocation = false; //Background location disabled - not needed with Health Connect
     static boolean requireStorage = true; //Set to "false" if you do NOT require APIs related to downloads or uploads; don't forget to also remove relevant entries in AndroidManifest.xml if you want to ensure the complete removal of the permission capability for the app
     static boolean requireCamera = true; //Set to "false" if you do NOT require APIs related to camera images / camera videos; don't forget to also remove relevant entries in AndroidManifest.xml if you want to ensure the complete removal of the permission capability for the app
     static boolean requireRecordAudio = true; //Set to "false" if you do NOT require APIs related to recording audio; don't forget to also remove relevant entries in AndroidManifest.xml if you want to ensure the complete removal of the permission capability for the app
