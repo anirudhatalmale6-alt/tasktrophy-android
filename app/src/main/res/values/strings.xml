@@ -43,6 +43,7 @@
     <string name="admob_rewarded_id" translatable="false">ca-app-pub-6353903215132082/9354694881</string>
     <string name="banner_footer" translatable="false">ca-app-pub-6353903215132082/3797092354</string>
     <string name="interstitial_full_screen" translatable="false">ca-app-pub-6353903215132082/1113242780</string>
+    <string name="app_open_ad_id" translatable="false">ca-app-pub-6353903215132082/6886178094</string>
 
     <!--Facebook Ads IDs-->
     <string name="facebook_banner_footer" translatable="false">IMG_16_9_APP_INSTALL#YOUR_PLACEMENT_ID</string>  <!-- Official Facebook Banner Ad Test ID: IMG_16_9_APP_INSTALL#YOUR_PLACEMENT_ID-->

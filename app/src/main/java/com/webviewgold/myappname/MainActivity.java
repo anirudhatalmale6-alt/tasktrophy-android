@@ -315,6 +315,7 @@ public class MainActivity extends AppCompatActivity
     private String successUrl = "", failUrl = "";
     private FrameLayout adLayout;
     private WebAppInterface webAppInterface;
+    private AppOpenAdManager appOpenAdManager;
     private StepKingBridge stepKingBridge;
     private DeepWorkBridge deepWorkBridge;
     private GhostRunnerBridge ghostRunnerBridge;
@@ -870,6 +871,9 @@ public class MainActivity extends AppCompatActivity
         webAppInterface = new WebAppInterface(this, webView, adLayout);
         webView.addJavascriptInterface(webAppInterface, "Android");
 
+        // App Open ad manager
+        appOpenAdManager = new AppOpenAdManager(this);
+
         // Step King - Health Connect bridge
         try {
             stepKingBridge = new StepKingBridge(this, webView);
@@ -1386,6 +1390,10 @@ public class MainActivity extends AppCompatActivity
                                 if (webAppInterface != null) {
                                     webAppInterface.preloadAllAds();
                                 }
+                                // Pre-load App Open ad
+                                if (appOpenAdManager != null) {
+                                    appOpenAdManager.loadAd();
+                                }
                             });
                         }
                     });
@@ -1400,6 +1408,10 @@ public class MainActivity extends AppCompatActivity
                 // Pre-load all ads via WebAppInterface (single source)
                 if (webAppInterface != null) {
                     webAppInterface.preloadAllAds();
+                }
+                // Pre-load App Open ad
+                if (appOpenAdManager != null) {
+                    appOpenAdManager.loadAd();
                 }
             });
         }
@@ -2520,6 +2532,15 @@ public class MainActivity extends AppCompatActivity
     }
 
     @Override
+    protected void onStart() {
+        super.onStart();
+        // Show App Open ad when user brings app to foreground
+        if (appOpenAdManager != null) {
+            appOpenAdManager.showAdIfReady();
+        }
+    }
+
+    @Override
     public void onResume() {
 
         if (Config.AUTO_REFRESH_ENABLED) {
@@ -2691,6 +2712,11 @@ public class MainActivity extends AppCompatActivity
         // Clean up WebAppInterface ads
         if (webAppInterface != null) {
             webAppInterface.destroy();
+        }
+
+        // Clean up App Open ad
+        if (appOpenAdManager != null) {
+            appOpenAdManager.destroy();
         }
 
         super.onDestroy();
