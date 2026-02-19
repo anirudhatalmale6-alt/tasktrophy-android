@@ -75,6 +75,7 @@ public class StepKingBridge {
 
     private HealthConnectClient healthConnectClient;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private volatile boolean cachedPermissionState = false;
 
     // Permission launcher - set from MainActivity
     private ActivityResultLauncher<Set<String>> permissionLauncher;
@@ -104,12 +105,40 @@ public class StepKingBridge {
             if (status == HealthConnectClient.SDK_AVAILABLE) {
                 healthConnectClient = HealthConnectClient.getOrCreate(context);
                 Log.d(TAG, "Health Connect client initialized");
+                // Check permissions asynchronously on init
+                refreshPermissionState();
             } else {
                 Log.w(TAG, "Health Connect not available, status: " + status);
             }
         } catch (Exception e) {
             Log.e(TAG, "Failed to init Health Connect: " + e.getMessage());
         }
+    }
+
+    /**
+     * Refreshes the cached permission state in the background.
+     * Called on init and after permission grant.
+     */
+    private void refreshPermissionState() {
+        if (healthConnectClient == null) {
+            cachedPermissionState = false;
+            return;
+        }
+        executor.execute(() -> {
+            try {
+                @SuppressWarnings("unchecked")
+                Set<String> granted = (Set<String>) BuildersKt.runBlocking(
+                    EmptyCoroutineContext.INSTANCE,
+                    (scope, continuation) -> healthConnectClient.getPermissionController()
+                        .getGrantedPermissions(continuation)
+                );
+                cachedPermissionState = granted.containsAll(REQUIRED_PERMISSIONS);
+                Log.d(TAG, "Permission state refreshed: " + cachedPermissionState);
+            } catch (Exception e) {
+                Log.e(TAG, "Error refreshing permission state: " + e.getMessage());
+                cachedPermissionState = false;
+            }
+        });
     }
 
     public void setPermissionLauncher(ActivityResultLauncher<Set<String>> launcher) {
@@ -175,17 +204,7 @@ public class StepKingBridge {
     @JavascriptInterface
     public boolean hasPermission() {
         if (healthConnectClient == null) return false;
-        try {
-            Set<String> granted = (Set<String>) BuildersKt.runBlocking(
-                EmptyCoroutineContext.INSTANCE,
-                (scope, continuation) -> healthConnectClient.getPermissionController()
-                    .getGrantedPermissions(continuation)
-            );
-            return granted.containsAll(REQUIRED_PERMISSIONS);
-        } catch (Exception e) {
-            Log.e(TAG, "Error checking permissions: " + e.getMessage());
-            return false;
-        }
+        return cachedPermissionState;
     }
 
     @JavascriptInterface
@@ -370,7 +389,7 @@ public class StepKingBridge {
                     TimeRangeFilter.between(startTime, endTime),
                     new HashSet<>(),
                     true,
-                    -1,
+                    1000,
                     null
                 );
 
@@ -508,6 +527,8 @@ public class StepKingBridge {
 
     /** Called from MainActivity when Health Connect permission is granted */
     public void onPermissionGranted() {
+        cachedPermissionState = true;
+        refreshPermissionState(); // Also verify async
         refreshSteps();
         getHeartPoints();
     }
