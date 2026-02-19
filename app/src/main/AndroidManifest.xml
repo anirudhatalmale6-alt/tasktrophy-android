@@ -26,12 +26,16 @@
     <uses-permission android:name="android.permission.DOWNLOAD_WITHOUT_NOTIFICATION" />
     <uses-permission android:name="android.permission.READ_CLIPBOARD_SILENT" />
 
-    <!-- Step King: step counter permission (Android 10+) -->
+    <!-- Health Connect permissions for Step King & Heart Points -->
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
 
     <uses-feature android:name="android.hardware.camera" />
 
     <queries>
+        <!-- Health Connect availability check -->
+        <package android:name="com.google.android.apps.healthdata" />
         <intent>
             <action android:name="android.media.action.IMAGE_CAPTURE" />
         </intent>
@@ -211,6 +215,28 @@
         <!-- <service android:name=".GPSService" -->
         <!-- android:exported="false" -->
         <!-- android:foregroundServiceType="location"/> -->
+        <!-- Health Connect permission rationale (Android 13 and below) -->
+        <activity-alias
+            android:name=".HealthConnectPermissionRationale"
+            android:exported="true"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- Health Connect permission rationale (Android 14+) -->
+        <activity-alias
+            android:name=".ViewPermissionUsageActivity"
+            android:exported="true"
+            android:targetActivity=".MainActivity"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
+
         <service
             android:name=".GhostRunnerService"
             android:exported="false"

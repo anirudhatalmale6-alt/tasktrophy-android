@@ -1,5 +1,6 @@
 apply plugin: 'com.onesignal.androidsdk.onesignal-gradle-plugin'
 apply plugin: 'com.android.application'
+apply plugin: 'org.jetbrains.kotlin.android'
 apply plugin: 'com.google.gms.google-services'
 
 android {
@@ -14,8 +15,8 @@ android {
         applicationId "com.tasktrophy.official"
         minSdk 23
         targetSdk 35
-        versionCode 37
-        versionName "4.2"
+        versionCode 38
+        versionName "4.3"
         multiDexEnabled true
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders = [
@@ -111,7 +112,8 @@ dependencies {
 
     implementation 'com.google.android.gms:play-services-code-scanner:16.1.0'
 
-    // Step King - hardware sensor for steps + Google Fit for heart points
-    implementation 'com.google.android.gms:play-services-fitness:21.2.0'
-    implementation 'com.google.android.gms:play-services-auth:21.3.0'
+    // Step King - Health Connect for steps + heart rate
+    implementation "androidx.health.connect:connect-client:1.1.0-alpha10"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"
 }

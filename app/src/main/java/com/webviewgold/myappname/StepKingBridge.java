@@ -1,40 +1,52 @@
 package com.webviewgold.myappname;
 
-import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
 import android.util.Log;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
-
-import com.google.android.gms.auth.api.signin.GoogleSignIn;
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
-import com.google.android.gms.fitness.Fitness;
-import com.google.android.gms.fitness.FitnessOptions;
-import com.google.android.gms.fitness.data.DataType;
-import com.google.android.gms.fitness.data.Field;
-import com.google.android.gms.fitness.request.DataReadRequest;
-import com.google.android.gms.fitness.result.DataReadResponse;
-import com.google.android.gms.fitness.data.DataSet;
-import com.google.android.gms.fitness.data.DataPoint;
-import com.google.android.gms.fitness.data.DataSource;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.health.connect.client.HealthConnectClient;
+import androidx.health.connect.client.PermissionController;
+import androidx.health.connect.client.permission.HealthPermission;
+import androidx.health.connect.client.records.HeartRateRecord;
+import androidx.health.connect.client.records.StepsRecord;
+import androidx.health.connect.client.records.metadata.DataOrigin;
+import androidx.health.connect.client.request.AggregateRequest;
+import androidx.health.connect.client.request.ReadRecordsRequest;
+import androidx.health.connect.client.response.AggregationResult;
+import androidx.health.connect.client.response.ReadRecordsResponse;
+import androidx.health.connect.client.time.TimeRangeFilter;
 
 import org.json.JSONObject;
 
-import java.util.Calendar;
-import java.util.concurrent.TimeUnit;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import kotlin.coroutines.EmptyCoroutineContext;
+import kotlin.jvm.JvmClassMappingKt;
+import kotlin.reflect.KClass;
+import kotlinx.coroutines.BuildersKt;
 
 /**
- * Step King Bridge - Google Fit for steps + heart points.
- * Uses Google Fit History API with data source filtering to exclude
- * manually entered data (e.g. "Trial 1" entries from Google Fit app).
+ * Step King Bridge - Health Connect for steps + heart rate.
+ * Replaces Google Fit with Health Connect API.
+ * Uses Health Connect's DataOrigin filtering to exclude manually entered data.
  */
 public class StepKingBridge {
 
@@ -46,10 +58,13 @@ public class StepKingBridge {
     private static final String KEY_MANUAL_STEPS = "manual_steps_today";
     private static final String KEY_MANUAL_HEART = "manual_heart_today";
 
-    public static final int GOOGLE_FIT_PERMISSIONS_REQUEST_CODE = 9002;
-    public static final int ACTIVITY_RECOGNITION_REQUEST_CODE = 9003;
+    private static final String HEALTH_CONNECT_PACKAGE = "com.google.android.apps.healthdata";
 
-    private static final String GOOGLE_FIT_PACKAGE = "com.google.android.apps.fitness";
+    // Known manual entry apps
+    private static final Set<String> MANUAL_ENTRY_PACKAGES = new HashSet<>(Arrays.asList(
+        "com.google.android.apps.healthdata",  // Health Connect app itself
+        "com.google.android.apps.fitness"       // Google Fit app
+    ));
 
     private final Context context;
     private final WebView webView;
@@ -58,30 +73,53 @@ public class StepKingBridge {
     private long manualSteps = 0;
     private float manualHeartPoints = 0;
 
-    private static FitnessOptions fitnessOptions;
+    private HealthConnectClient healthConnectClient;
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
-    private static FitnessOptions getFitnessOptions() {
-        if (fitnessOptions == null) {
-            fitnessOptions = FitnessOptions.builder()
-                .addDataType(DataType.TYPE_STEP_COUNT_DELTA, FitnessOptions.ACCESS_READ)
-                .addDataType(DataType.TYPE_HEART_POINTS, FitnessOptions.ACCESS_READ)
-                .addDataType(DataType.AGGREGATE_STEP_COUNT_DELTA, FitnessOptions.ACCESS_READ)
-                .addDataType(DataType.AGGREGATE_HEART_POINTS, FitnessOptions.ACCESS_READ)
-                .build();
-        }
-        return fitnessOptions;
-    }
+    // Permission launcher - set from MainActivity
+    private ActivityResultLauncher<Set<String>> permissionLauncher;
+
+    @SuppressWarnings("unchecked")
+    private static final KClass<StepsRecord> STEPS_KCLASS =
+        JvmClassMappingKt.getKotlinClass(StepsRecord.class);
+    @SuppressWarnings("unchecked")
+    private static final KClass<HeartRateRecord> HR_KCLASS =
+        JvmClassMappingKt.getKotlinClass(HeartRateRecord.class);
+
+    public static final Set<String> REQUIRED_PERMISSIONS = new HashSet<>(Arrays.asList(
+        HealthPermission.getReadPermission(STEPS_KCLASS),
+        HealthPermission.getReadPermission(HR_KCLASS)
+    ));
 
     public StepKingBridge(Context context, WebView webView) {
         this.context = context;
         this.webView = webView;
         loadCachedData();
+        initHealthConnect();
+    }
+
+    private void initHealthConnect() {
+        try {
+            int status = HealthConnectClient.getSdkStatus(context, HEALTH_CONNECT_PACKAGE);
+            if (status == HealthConnectClient.SDK_AVAILABLE) {
+                healthConnectClient = HealthConnectClient.getOrCreate(context);
+                Log.d(TAG, "Health Connect client initialized");
+            } else {
+                Log.w(TAG, "Health Connect not available, status: " + status);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to init Health Connect: " + e.getMessage());
+        }
+    }
+
+    public void setPermissionLauncher(ActivityResultLauncher<Set<String>> launcher) {
+        this.permissionLauncher = launcher;
     }
 
     private void loadCachedData() {
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String cachedDate = prefs.getString(KEY_STEPS_DATE, "");
-        String today = java.time.LocalDate.now().toString();
+        String today = LocalDate.now().toString();
         if (today.equals(cachedDate)) {
             todaySteps = prefs.getLong(KEY_STEPS_TODAY, 0);
             todayHeartPoints = prefs.getFloat(KEY_HEART_POINTS, 0);
@@ -108,7 +146,7 @@ public class StepKingBridge {
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         prefs.edit()
             .putLong(KEY_STEPS_TODAY, steps)
-            .putString(KEY_STEPS_DATE, java.time.LocalDate.now().toString())
+            .putString(KEY_STEPS_DATE, LocalDate.now().toString())
             .putFloat(KEY_HEART_POINTS, heartPoints)
             .putLong(KEY_MANUAL_STEPS, manualSteps)
             .putFloat(KEY_MANUAL_HEART, manualHeartPoints)
@@ -116,52 +154,10 @@ public class StepKingBridge {
     }
 
     /**
-     * Determines whether a data point was manually entered.
-     * Manual entries come from the Google Fit app itself, or have
-     * "user_input" in the stream name, or are raw data with no device.
+     * Gets start of today as Instant.
      */
-    private boolean isManualEntry(DataPoint dp) {
-        DataSource source = dp.getOriginalDataSource();
-        if (source == null) {
-            source = dp.getDataSource();
-        }
-        if (source == null) {
-            return false;
-        }
-
-        // Check app package name - Google Fit app = manual entry
-        String pkg = source.getAppPackageName();
-        if (pkg != null && pkg.equals(GOOGLE_FIT_PACKAGE)) {
-            return true;
-        }
-
-        // Check stream name for "user_input"
-        String stream = source.getStreamName();
-        if (stream != null && stream.toLowerCase().contains("user_input")) {
-            return true;
-        }
-
-        // Check for raw type with no device (another indicator of manual entry)
-        if (source.getType() == DataSource.TYPE_RAW && source.getDevice() == null) {
-            // Only flag as manual if there is also no known app behind it
-            if (pkg == null || pkg.isEmpty()) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Returns the start-of-day timestamp in millis for today.
-     */
-    private long getStartOfDayMillis() {
-        Calendar cal = Calendar.getInstance();
-        cal.set(Calendar.HOUR_OF_DAY, 0);
-        cal.set(Calendar.MINUTE, 0);
-        cal.set(Calendar.SECOND, 0);
-        cal.set(Calendar.MILLISECOND, 0);
-        return cal.getTimeInMillis();
+    private Instant getStartOfDayInstant() {
+        return LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant();
     }
 
     // ─── JS Interface Methods ───
@@ -169,8 +165,8 @@ public class StepKingBridge {
     @JavascriptInterface
     public boolean isAvailable() {
         try {
-            return com.google.android.gms.common.GoogleApiAvailability.getInstance()
-                .isGooglePlayServicesAvailable(context) == com.google.android.gms.common.ConnectionResult.SUCCESS;
+            int status = HealthConnectClient.getSdkStatus(context, HEALTH_CONNECT_PACKAGE);
+            return status == HealthConnectClient.SDK_AVAILABLE;
         } catch (Exception e) {
             return false;
         }
@@ -178,10 +174,16 @@ public class StepKingBridge {
 
     @JavascriptInterface
     public boolean hasPermission() {
+        if (healthConnectClient == null) return false;
         try {
-            GoogleSignInAccount account = GoogleSignIn.getAccountForExtension(context, getFitnessOptions());
-            return GoogleSignIn.hasPermissions(account, getFitnessOptions());
+            Set<String> granted = (Set<String>) BuildersKt.runBlocking(
+                EmptyCoroutineContext.INSTANCE,
+                (scope, continuation) -> healthConnectClient.getPermissionController()
+                    .getGrantedPermissions(continuation)
+            );
+            return granted.containsAll(REQUIRED_PERMISSIONS);
         } catch (Exception e) {
+            Log.e(TAG, "Error checking permissions: " + e.getMessage());
             return false;
         }
     }
@@ -191,19 +193,32 @@ public class StepKingBridge {
         if (context instanceof Activity) {
             ((Activity) context).runOnUiThread(() -> {
                 try {
-                    GoogleSignInAccount account = GoogleSignIn.getAccountForExtension(context, getFitnessOptions());
-                    if (!GoogleSignIn.hasPermissions(account, getFitnessOptions())) {
-                        GoogleSignIn.requestPermissions(
-                            (Activity) context,
-                            GOOGLE_FIT_PERMISSIONS_REQUEST_CODE,
-                            account,
-                            getFitnessOptions()
-                        );
+                    if (healthConnectClient == null) {
+                        // Health Connect not available - try to install it
+                        int status = HealthConnectClient.getSdkStatus(context, HEALTH_CONNECT_PACKAGE);
+                        if (status == HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED) {
+                            String uriString = "market://details?id=" + HEALTH_CONNECT_PACKAGE
+                                + "&url=healthconnect%3A%2F%2Fonboarding";
+                            Intent intent = new Intent(Intent.ACTION_VIEW);
+                            intent.setPackage("com.android.vending");
+                            intent.setData(Uri.parse(uriString));
+                            intent.putExtra("overlay", true);
+                            intent.putExtra("callerId", context.getPackageName());
+                            context.startActivity(intent);
+                        } else {
+                            callJsCallback(-1, "Health Connect not available on this device");
+                        }
+                        return;
+                    }
+
+                    if (permissionLauncher != null) {
+                        permissionLauncher.launch(REQUIRED_PERMISSIONS);
                     } else {
-                        refreshSteps();
+                        Log.e(TAG, "Permission launcher not set");
+                        callJsCallback(-1, "Permission launcher not initialized");
                     }
                 } catch (Exception e) {
-                    Log.e(TAG, "Error requesting Google Fit permission: " + e.getMessage());
+                    Log.e(TAG, "Error requesting Health Connect permission: " + e.getMessage());
                     callJsCallback(-1, "Failed to request permission: " + e.getMessage());
                 }
             });
@@ -217,244 +232,219 @@ public class StepKingBridge {
 
     @JavascriptInterface
     public void refreshSteps() {
-        if (!(context instanceof Activity)) return;
+        if (healthConnectClient == null) {
+            callJsCallback(-1, "Health Connect not available");
+            return;
+        }
 
-        ((Activity) context).runOnUiThread(() -> {
+        executor.execute(() -> {
             try {
-                GoogleSignInAccount account = GoogleSignIn.getAccountForExtension(context, getFitnessOptions());
-                if (!GoogleSignIn.hasPermissions(account, getFitnessOptions())) {
-                    callJsCallback(-1, "Google Fit permission not granted");
-                    return;
-                }
+                Instant startTime = getStartOfDayInstant();
+                Instant endTime = Instant.now();
 
-                // Primary: Use readDailyTotal (works without ACTIVITY_RECOGNITION permission)
-                Fitness.getHistoryClient((Activity) context, account)
-                    .readDailyTotal(DataType.TYPE_STEP_COUNT_DELTA)
-                    .addOnSuccessListener(dataSet -> {
-                        long totalSteps = 0;
-                        if (!dataSet.isEmpty()) {
-                            totalSteps = dataSet.getDataPoints().get(0)
-                                .getValue(Field.FIELD_STEPS).asInt();
-                        }
-                        Log.d(TAG, "Google Fit daily total steps: " + totalSteps);
+                // Aggregate total steps for today
+                AggregateRequest aggregateRequest = new AggregateRequest(
+                    new HashSet<>(Arrays.asList(StepsRecord.COUNT_TOTAL)),
+                    TimeRangeFilter.between(startTime, endTime),
+                    new HashSet<>() // no data origin filter - get all
+                );
 
-                        // Save total steps (we'll subtract manual if detected later)
-                        final long stepsFromTotal = totalSteps;
-                        saveData(stepsFromTotal, todayHeartPoints);
-                        callJsCallback(stepsFromTotal, null);
+                AggregationResult result = (AggregationResult) BuildersKt.runBlocking(
+                    EmptyCoroutineContext.INSTANCE,
+                    (scope, continuation) -> healthConnectClient.aggregate(aggregateRequest, continuation)
+                );
 
-                        // Secondary: Try History API for manual detection (may fail without ACTIVITY_RECOGNITION)
-                        tryDetectManualSteps(account, stepsFromTotal);
-                    })
-                    .addOnFailureListener(e -> {
-                        Log.e(TAG, "Failed to read steps: " + e.getMessage());
-                        callJsCallback(-1, "Failed to read steps: " + e.getMessage());
-                    });
+                Long totalSteps = result.get(StepsRecord.COUNT_TOTAL);
+                long stepsCount = (totalSteps != null) ? totalSteps : 0;
+                Log.d(TAG, "Health Connect total steps: " + stepsCount);
+
+                // Now read individual records to detect manual entries
+                detectManualSteps(startTime, endTime, stepsCount);
+
             } catch (Exception e) {
-                Log.e(TAG, "Error reading steps: " + e.getMessage());
-                callJsCallback(-1, e.getMessage());
+                Log.e(TAG, "Failed to read steps: " + e.getMessage(), e);
+                callJsCallback(-1, "Failed to read steps: " + e.getMessage());
             }
         });
     }
 
     /**
-     * Checks if ACTIVITY_RECOGNITION permission is granted (required on Android 10+).
+     * Reads individual step records to detect and filter manual entries.
+     * Manual entries come from Health Connect app or Google Fit app.
      */
-    private boolean hasActivityRecognitionPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            return ContextCompat.checkSelfPermission(context,
-                Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED;
-        }
-        return true; // Not needed below Android 10
-    }
-
-    /**
-     * Requests ACTIVITY_RECOGNITION runtime permission (Android 10+).
-     * After granted, call refreshSteps() to retry manual detection.
-     */
-    @JavascriptInterface
-    public void requestActivityRecognition() {
-        if (context instanceof Activity && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            ((Activity) context).runOnUiThread(() -> {
-                ActivityCompat.requestPermissions((Activity) context,
-                    new String[]{Manifest.permission.ACTIVITY_RECOGNITION},
-                    ACTIVITY_RECOGNITION_REQUEST_CODE);
-            });
-        }
-    }
-
-    /**
-     * Called from MainActivity when ACTIVITY_RECOGNITION permission is granted.
-     * Re-runs manual detection that previously failed.
-     */
-    public void onActivityRecognitionGranted() {
-        Log.d(TAG, "ACTIVITY_RECOGNITION granted - retrying manual detection");
-        refreshSteps();
-        getHeartPoints();
-    }
-
-    /**
-     * Secondary check: tries History API to detect manual entries.
-     * Requires ACTIVITY_RECOGNITION permission on Android 10+ for step data.
-     * If permission not granted, requests it. If manual entries found, recalculates
-     * valid steps and notifies frontend.
-     */
-    private void tryDetectManualSteps(GoogleSignInAccount account, long totalFromDailyRead) {
-        if (!(context instanceof Activity)) return;
-
-        // Check ACTIVITY_RECOGNITION permission first (required for step History API on Android 10+)
-        if (!hasActivityRecognitionPermission()) {
-            Log.w(TAG, "ACTIVITY_RECOGNITION permission not granted - requesting it");
-            requestActivityRecognition();
-            return;
-        }
-
+    @SuppressWarnings("unchecked")
+    private void detectManualSteps(Instant startTime, Instant endTime, long totalFromAggregate) {
         try {
-            long startTime = getStartOfDayMillis();
-            long endTime = System.currentTimeMillis();
+            ReadRecordsRequest<StepsRecord> readRequest = new ReadRecordsRequest<>(
+                STEPS_KCLASS,
+                TimeRangeFilter.between(startTime, endTime),
+                new HashSet<>(), // no data origin filter
+                true,  // ascending
+                1000,  // page size (default)
+                null   // no page token
+            );
 
-            DataReadRequest readRequest = new DataReadRequest.Builder()
-                .read(DataType.TYPE_STEP_COUNT_DELTA)
-                .setTimeRange(startTime, endTime, TimeUnit.MILLISECONDS)
-                .enableServerQueries()
-                .build();
+            ReadRecordsResponse<StepsRecord> response = (ReadRecordsResponse<StepsRecord>) BuildersKt.runBlocking(
+                EmptyCoroutineContext.INSTANCE,
+                (scope, continuation) -> healthConnectClient.readRecords(readRequest, continuation)
+            );
 
-            Fitness.getHistoryClient((Activity) context, account)
-                .readData(readRequest)
-                .addOnSuccessListener(response -> {
-                    long validSteps = 0;
-                    long manualStepsLocal = 0;
+            long validSteps = 0;
+            long manualStepsLocal = 0;
 
-                    for (DataSet dataSet : response.getDataSets()) {
-                        for (DataPoint dp : dataSet.getDataPoints()) {
-                            int stepVal = dp.getValue(Field.FIELD_STEPS).asInt();
-                            if (isManualEntry(dp)) {
-                                manualStepsLocal += stepVal;
-                                Log.d(TAG, "FILTERED manual steps: " + stepVal
-                                    + " from " + dp.getOriginalDataSource());
-                            } else {
-                                validSteps += stepVal;
-                            }
-                        }
-                    }
+            for (StepsRecord record : response.getRecords()) {
+                DataOrigin origin = record.getMetadata().getDataOrigin();
+                String packageName = origin.getPackageName();
+                long count = record.getCount();
 
-                    manualSteps = manualStepsLocal;
+                if (isManualSource(packageName, record)) {
+                    manualStepsLocal += count;
+                    Log.d(TAG, "FILTERED manual steps: " + count + " from " + packageName);
+                } else {
+                    validSteps += count;
+                }
+            }
 
-                    if (manualStepsLocal > 0) {
-                        // Recalculate: use filtered count from History API
-                        saveData(validSteps, todayHeartPoints);
-                        callJsCallback(validSteps, null);
-                        callJsManualEntryDetected();
-                        Log.d(TAG, "Manual steps detected: " + manualStepsLocal
-                            + ", valid: " + validSteps);
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    // History API failed (likely missing ACTIVITY_RECOGNITION permission)
-                    // Silently ignore - readDailyTotal data is already shown
-                    Log.w(TAG, "History API for manual detection failed (expected if no ACTIVITY_RECOGNITION): "
-                        + e.getMessage());
-                });
+            manualSteps = manualStepsLocal;
+
+            if (manualStepsLocal > 0) {
+                // Use filtered count
+                saveData(validSteps, todayHeartPoints);
+                callJsCallback(validSteps, null);
+                callJsManualEntryDetected();
+                Log.d(TAG, "Manual steps detected: " + manualStepsLocal + ", valid: " + validSteps);
+            } else {
+                // No manual entries - use aggregate total (more accurate for dedup)
+                saveData(totalFromAggregate, todayHeartPoints);
+                callJsCallback(totalFromAggregate, null);
+            }
+
         } catch (Exception e) {
-            Log.w(TAG, "tryDetectManualSteps error: " + e.getMessage());
+            // If individual read fails, use aggregate total
+            Log.w(TAG, "Manual detection failed, using aggregate: " + e.getMessage());
+            saveData(totalFromAggregate, todayHeartPoints);
+            callJsCallback(totalFromAggregate, null);
         }
+    }
+
+    /**
+     * Determines if a step record is from a manual entry source.
+     */
+    private boolean isManualSource(String packageName, StepsRecord record) {
+        if (packageName == null) return false;
+
+        // Known manual entry apps
+        if (MANUAL_ENTRY_PACKAGES.contains(packageName)) {
+            return true;
+        }
+
+        // Check recording method if available (API 34+)
+        try {
+            int recordingMethod = record.getMetadata().getRecordingMethod();
+            // RECORDING_METHOD_MANUAL_ENTRY = 2
+            if (recordingMethod == 2) {
+                return true;
+            }
+        } catch (Exception e) {
+            // recordingMethod not available on older API
+        }
+
+        return false;
     }
 
     @JavascriptInterface
     public void getHeartPoints() {
-        if (!(context instanceof Activity)) return;
+        if (healthConnectClient == null) {
+            callJsHeartPoints(-1, "Health Connect not available");
+            return;
+        }
 
-        ((Activity) context).runOnUiThread(() -> {
+        executor.execute(() -> {
             try {
-                GoogleSignInAccount account = GoogleSignIn.getAccountForExtension(context, getFitnessOptions());
-                if (!GoogleSignIn.hasPermissions(account, getFitnessOptions())) {
-                    callJsHeartPoints(-1, "Google Fit permission not granted");
-                    return;
+                Instant startTime = getStartOfDayInstant();
+                Instant endTime = Instant.now();
+
+                // Read heart rate records for today
+                ReadRecordsRequest<HeartRateRecord> readRequest = new ReadRecordsRequest<>(
+                    HR_KCLASS,
+                    TimeRangeFilter.between(startTime, endTime),
+                    new HashSet<>(),
+                    true,
+                    -1,
+                    null
+                );
+
+                @SuppressWarnings("unchecked")
+                ReadRecordsResponse<HeartRateRecord> response = (ReadRecordsResponse<HeartRateRecord>) BuildersKt.runBlocking(
+                    EmptyCoroutineContext.INSTANCE,
+                    (scope, continuation) -> healthConnectClient.readRecords(readRequest, continuation)
+                );
+
+                // Calculate "heart points" from heart rate data
+                // Google Fit awards: 1 point per minute of moderate activity (HR > 50% max),
+                // 2 points per minute of vigorous activity (HR > 70% max)
+                // We approximate: count minutes with HR data as heart points
+                float totalPoints = 0;
+                float manualPointsLocal = 0;
+
+                for (HeartRateRecord record : response.getRecords()) {
+                    DataOrigin origin = record.getMetadata().getDataOrigin();
+                    String packageName = origin.getPackageName();
+
+                    // Calculate duration in minutes
+                    long durationMs = record.getEndTime().toEpochMilli() - record.getStartTime().toEpochMilli();
+                    float durationMins = durationMs / 60000f;
+
+                    // Calculate average BPM for this record
+                    List<HeartRateRecord.Sample> samples = record.getSamples();
+                    if (samples.isEmpty()) continue;
+
+                    long totalBpm = 0;
+                    for (HeartRateRecord.Sample sample : samples) {
+                        totalBpm += sample.getBeatsPerMinute();
+                    }
+                    float avgBpm = (float) totalBpm / samples.size();
+
+                    // Award points based on intensity
+                    // Moderate activity (BPM > 100): 1 point per minute
+                    // Vigorous activity (BPM > 130): 2 points per minute
+                    float points = 0;
+                    if (avgBpm > 130) {
+                        points = durationMins * 2;
+                    } else if (avgBpm > 100) {
+                        points = durationMins;
+                    }
+
+                    boolean isManual = MANUAL_ENTRY_PACKAGES.contains(packageName);
+                    try {
+                        int recordingMethod = record.getMetadata().getRecordingMethod();
+                        if (recordingMethod == 2) isManual = true;
+                    } catch (Exception ignored) {}
+
+                    if (isManual) {
+                        manualPointsLocal += points;
+                        Log.d(TAG, "FILTERED manual heart points: " + points + " from " + packageName);
+                    } else {
+                        totalPoints += points;
+                    }
                 }
 
-                // Primary: Use readDailyTotal (works without ACTIVITY_RECOGNITION permission)
-                Fitness.getHistoryClient((Activity) context, account)
-                    .readDailyTotal(DataType.TYPE_HEART_POINTS)
-                    .addOnSuccessListener(dataSet -> {
-                        float totalPoints = 0;
-                        if (!dataSet.isEmpty()) {
-                            totalPoints = dataSet.getDataPoints().get(0)
-                                .getValue(Field.FIELD_INTENSITY).asFloat();
-                        }
-                        Log.d(TAG, "Google Fit daily total heart points: " + totalPoints);
+                manualHeartPoints = manualPointsLocal;
+                todayHeartPoints = totalPoints;
+                saveData(todaySteps, totalPoints);
+                callJsHeartPoints(totalPoints, null);
 
-                        todayHeartPoints = totalPoints;
-                        saveData(todaySteps, totalPoints);
-                        callJsHeartPoints(totalPoints, null);
+                if (manualPointsLocal > 0) {
+                    callJsManualEntryDetected();
+                    Log.d(TAG, "Manual heart points detected: " + manualPointsLocal
+                        + ", valid: " + totalPoints);
+                }
 
-                        // Secondary: Try History API for manual detection
-                        tryDetectManualHeartPoints(account, totalPoints);
-                    })
-                    .addOnFailureListener(e -> {
-                        Log.e(TAG, "Failed to read heart points: " + e.getMessage());
-                        callJsHeartPoints(-1, "Failed to read heart points");
-                    });
             } catch (Exception e) {
-                Log.e(TAG, "Error reading heart points: " + e.getMessage());
-                callJsHeartPoints(-1, e.getMessage());
+                Log.e(TAG, "Failed to read heart rate: " + e.getMessage(), e);
+                callJsHeartPoints(-1, "Failed to read heart rate: " + e.getMessage());
             }
         });
-    }
-
-    /**
-     * Secondary check: tries History API to detect manual heart point entries.
-     * If this fails (e.g. no ACTIVITY_RECOGNITION permission), we silently ignore.
-     */
-    private void tryDetectManualHeartPoints(GoogleSignInAccount account, float totalFromDailyRead) {
-        if (!(context instanceof Activity)) return;
-
-        try {
-            long startTime = getStartOfDayMillis();
-            long endTime = System.currentTimeMillis();
-
-            DataReadRequest readRequest = new DataReadRequest.Builder()
-                .read(DataType.TYPE_HEART_POINTS)
-                .setTimeRange(startTime, endTime, TimeUnit.MILLISECONDS)
-                .enableServerQueries()
-                .build();
-
-            Fitness.getHistoryClient((Activity) context, account)
-                .readData(readRequest)
-                .addOnSuccessListener(response -> {
-                    float validPoints = 0;
-                    float manualPointsLocal = 0;
-
-                    for (DataSet dataSet : response.getDataSets()) {
-                        for (DataPoint dp : dataSet.getDataPoints()) {
-                            float pointVal = dp.getValue(Field.FIELD_INTENSITY).asFloat();
-                            if (isManualEntry(dp)) {
-                                manualPointsLocal += pointVal;
-                                Log.d(TAG, "FILTERED manual heart points: " + pointVal
-                                    + " from " + dp.getOriginalDataSource());
-                            } else {
-                                validPoints += pointVal;
-                            }
-                        }
-                    }
-
-                    manualHeartPoints = manualPointsLocal;
-
-                    if (manualPointsLocal > 0) {
-                        // Recalculate: use filtered count
-                        todayHeartPoints = validPoints;
-                        saveData(todaySteps, validPoints);
-                        callJsHeartPoints(validPoints, null);
-                        callJsManualEntryDetected();
-                        Log.d(TAG, "Manual heart points detected: " + manualPointsLocal
-                            + ", valid: " + validPoints);
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    Log.w(TAG, "History API for manual HP detection failed: " + e.getMessage());
-                });
-        } catch (Exception e) {
-            Log.w(TAG, "tryDetectManualHeartPoints error: " + e.getMessage());
-        }
     }
 
     @JavascriptInterface
@@ -484,13 +474,13 @@ public class StepKingBridge {
             info.put("model", Build.MODEL);
             info.put("manufacturer", Build.MANUFACTURER);
             info.put("sdk", Build.VERSION.SDK_INT);
-            info.put("googleFitAvailable", isAvailable());
+            info.put("healthConnectAvailable", isAvailable());
             info.put("hasPermission", hasPermission());
             info.put("todaySteps", todaySteps);
             info.put("todayHeartPoints", todayHeartPoints);
             info.put("manualSteps", manualSteps);
             info.put("manualHeartPoints", manualHeartPoints);
-            info.put("source", "google_fit_filtered");
+            info.put("source", "health_connect");
             return info.toString();
         } catch (Exception e) {
             return "{}";
@@ -499,7 +489,6 @@ public class StepKingBridge {
 
     /**
      * Returns a JSON string with manual entry warning info.
-     * JS can call: var warning = JSON.parse(window.StepKing.getManualWarning());
      */
     @JavascriptInterface
     public String getManualWarning() {
@@ -517,10 +506,24 @@ public class StepKingBridge {
         }
     }
 
-    /** Called from MainActivity when Google Fit permission is granted */
+    /** Called from MainActivity when Health Connect permission is granted */
     public void onPermissionGranted() {
         refreshSteps();
         getHeartPoints();
+    }
+
+    /**
+     * Kept for backward compatibility - no longer needed with Health Connect
+     * (ACTIVITY_RECOGNITION is not required)
+     */
+    @JavascriptInterface
+    public void requestActivityRecognition() {
+        // No-op: Health Connect doesn't need ACTIVITY_RECOGNITION
+        Log.d(TAG, "requestActivityRecognition called - not needed for Health Connect");
+    }
+
+    public void onActivityRecognitionGranted() {
+        // No-op: not needed for Health Connect
     }
 
     // ─── JS Callbacks ───
@@ -555,10 +558,6 @@ public class StepKingBridge {
         }
     }
 
-    /**
-     * Calls window.onManualEntryDetected(manualSteps, manualHeartPoints)
-     * so the frontend can show a warning about filtered manual data.
-     */
     private void callJsManualEntryDetected() {
         if (context instanceof Activity) {
             ((Activity) context).runOnUiThread(() -> {

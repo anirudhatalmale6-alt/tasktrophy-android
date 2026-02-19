@@ -218,6 +218,8 @@ import com.webviewgold.myappname.deeplinking.Deeplinking;
 import com.webviewgold.myappname.flashlight.FlashLightManager;
 import com.webviewgold.myappname.videoplayer.NativeVideoActivity;
 
+import androidx.health.connect.client.PermissionController;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -316,6 +318,22 @@ public class MainActivity extends AppCompatActivity
     private StepKingBridge stepKingBridge;
     private DeepWorkBridge deepWorkBridge;
     private GhostRunnerBridge ghostRunnerBridge;
+
+    // Health Connect permission launcher
+    private final ActivityResultLauncher<Set<String>> healthConnectPermissionLauncher =
+        registerForActivityResult(
+            PermissionController.createRequestPermissionResultContract(),
+            granted -> {
+                if (granted.containsAll(StepKingBridge.REQUIRED_PERMISSIONS)) {
+                    Log.d("MainActivity", "Health Connect permissions granted");
+                    if (stepKingBridge != null) {
+                        stepKingBridge.onPermissionGranted();
+                    }
+                } else {
+                    Log.w("MainActivity", "Health Connect permissions denied");
+                }
+            }
+        );
 
     private boolean offlineFileLoaded = false;
     private boolean isNotificationURL = false;
@@ -852,9 +870,10 @@ public class MainActivity extends AppCompatActivity
         webAppInterface = new WebAppInterface(this, webView, adLayout);
         webView.addJavascriptInterface(webAppInterface, "Android");
 
-        // Step King - Google Fit bridge
+        // Step King - Health Connect bridge
         try {
             stepKingBridge = new StepKingBridge(this, webView);
+            stepKingBridge.setPermissionLauncher(healthConnectPermissionLauncher);
             webView.addJavascriptInterface(stepKingBridge, "StepKing");
         } catch (Throwable t) {
             android.util.Log.e("MainActivity", "StepKingBridge init failed: " + t.getMessage());
@@ -1699,13 +1718,8 @@ public class MainActivity extends AppCompatActivity
     public void onActivityResult(int requestCode, int resultCode, Intent intent) {
         super.onActivityResult(requestCode, resultCode, intent);
 
-        // Step King - Google Fit permission callback
-        if (requestCode == StepKingBridge.GOOGLE_FIT_PERMISSIONS_REQUEST_CODE) {
-            if (resultCode == RESULT_OK && stepKingBridge != null) {
-                stepKingBridge.onPermissionGranted();
-            }
-            return;
-        }
+        // Health Connect permissions are handled via ActivityResultLauncher
+        // (healthConnectPermissionLauncher), not here
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             if (requestCode == REQUEST_SELECT_FILE) {
@@ -2341,17 +2355,8 @@ public class MainActivity extends AppCompatActivity
             ghostRunnerBridge.onPermissionResult(requestCode, permissions, grantResults);
         }
 
-        // ACTIVITY_RECOGNITION permission for Step King manual entry detection
-        if (requestCode == StepKingBridge.ACTIVITY_RECOGNITION_REQUEST_CODE) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                Log.d("MainActivity", "ACTIVITY_RECOGNITION permission granted");
-                if (stepKingBridge != null) {
-                    stepKingBridge.onActivityRecognitionGranted();
-                }
-            } else {
-                Log.w("MainActivity", "ACTIVITY_RECOGNITION permission denied - manual entry detection unavailable");
-            }
-        }
+        // ACTIVITY_RECOGNITION no longer needed for Health Connect
+        // Health Connect uses its own permission system
 
         if (requestCode == REQUEST_PERMISSION_STORAGE_CAMERA) {
             boolean isAllPermissionGranted = hasPermissions(this, permissions);

@@ -6,6 +6,11 @@ import android.provider.Settings;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
+import androidx.health.connect.client.HealthConnectClient;
+import androidx.health.connect.client.records.StepsRecord;
+import androidx.health.connect.client.request.AggregateRequest;
+import androidx.health.connect.client.response.AggregationResult;
+import androidx.health.connect.client.time.TimeRangeFilter;
 import androidx.work.Constraints;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.NetworkType;
@@ -17,7 +22,15 @@ import androidx.work.WorkerParameters;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.concurrent.TimeUnit;
+
+import kotlin.coroutines.EmptyCoroutineContext;
+import kotlinx.coroutines.BuildersKt;
 
 public class StepSyncWorker extends Worker {
 
@@ -26,6 +39,7 @@ public class StepSyncWorker extends Worker {
     private static final String PREFS_NAME = "stepking_prefs";
     private static final String KEY_STEPS_TODAY = "steps_today";
     private static final String KEY_STEPS_DATE = "steps_date";
+    private static final String HEALTH_CONNECT_PACKAGE = "com.google.android.apps.healthdata";
 
     private static final String SYNC_URL = "https://tasktrophy.in/games/step-king/api.php?action=sync_steps";
 
@@ -37,18 +51,27 @@ public class StepSyncWorker extends Worker {
     @Override
     public Result doWork() {
         try {
-            SharedPreferences prefs = getApplicationContext()
-                .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            long steps = 0;
 
-            String today = java.time.LocalDate.now().toString();
-            String cachedDate = prefs.getString(KEY_STEPS_DATE, "");
+            // Try reading directly from Health Connect first
+            steps = readStepsFromHealthConnect();
 
-            if (!today.equals(cachedDate)) {
-                Log.d(TAG, "No step data for today, skipping sync");
-                return Result.success();
+            // Fallback to cached data if Health Connect read fails
+            if (steps <= 0) {
+                SharedPreferences prefs = getApplicationContext()
+                    .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+
+                String today = LocalDate.now().toString();
+                String cachedDate = prefs.getString(KEY_STEPS_DATE, "");
+
+                if (!today.equals(cachedDate)) {
+                    Log.d(TAG, "No step data for today, skipping sync");
+                    return Result.success();
+                }
+
+                steps = prefs.getLong(KEY_STEPS_TODAY, 0);
             }
 
-            long steps = prefs.getLong(KEY_STEPS_TODAY, 0);
             if (steps <= 0) {
                 Log.d(TAG, "Zero steps, skipping sync");
                 return Result.success();
@@ -66,6 +89,56 @@ public class StepSyncWorker extends Worker {
         } catch (Exception e) {
             Log.e(TAG, "Step sync failed: " + e.getMessage(), e);
             return Result.retry();
+        }
+    }
+
+    /**
+     * Reads today's steps directly from Health Connect.
+     * Returns 0 if Health Connect is not available or read fails.
+     */
+    private long readStepsFromHealthConnect() {
+        try {
+            Context ctx = getApplicationContext();
+            int status = HealthConnectClient.getSdkStatus(ctx, HEALTH_CONNECT_PACKAGE);
+            if (status != HealthConnectClient.SDK_AVAILABLE) {
+                Log.d(TAG, "Health Connect not available for background read");
+                return 0;
+            }
+
+            HealthConnectClient client = HealthConnectClient.getOrCreate(ctx);
+
+            Instant startTime = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant();
+            Instant endTime = Instant.now();
+
+            AggregateRequest request = new AggregateRequest(
+                new HashSet<>(Arrays.asList(StepsRecord.COUNT_TOTAL)),
+                TimeRangeFilter.between(startTime, endTime),
+                new HashSet<>()
+            );
+
+            AggregationResult result = (AggregationResult) BuildersKt.runBlocking(
+                EmptyCoroutineContext.INSTANCE,
+                (scope, continuation) -> client.aggregate(request, continuation)
+            );
+
+            Long totalSteps = result.get(StepsRecord.COUNT_TOTAL);
+            long steps = (totalSteps != null) ? totalSteps : 0;
+            Log.d(TAG, "Health Connect background read: " + steps + " steps");
+
+            // Update cached data
+            if (steps > 0) {
+                SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+                prefs.edit()
+                    .putLong(KEY_STEPS_TODAY, steps)
+                    .putString(KEY_STEPS_DATE, LocalDate.now().toString())
+                    .apply();
+            }
+
+            return steps;
+
+        } catch (Exception e) {
+            Log.w(TAG, "Health Connect background read failed: " + e.getMessage());
+            return 0;
         }
     }
 
