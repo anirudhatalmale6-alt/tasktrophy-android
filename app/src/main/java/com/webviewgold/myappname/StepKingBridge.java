@@ -369,14 +369,14 @@ public class StepKingBridge {
                     (scope, continuation) -> healthConnectClient.aggregate(aggregateRequest, continuation)
                 );
 
-                // Distance is returned as Length which has getInMeters()
+                // Distance is returned as Length which has getMeters()
                 Object distObj = result.get(DistanceRecord.DISTANCE_TOTAL);
                 double distMeters = 0;
                 if (distObj != null) {
                     // DistanceRecord.DISTANCE_TOTAL returns a Length object
                     androidx.health.connect.client.units.Length length =
                         (androidx.health.connect.client.units.Length) distObj;
-                    distMeters = length.getInMeters();
+                    distMeters = length.getMeters();
                 }
 
                 Log.d(TAG, "Health Connect total distance: " + distMeters + "m");
