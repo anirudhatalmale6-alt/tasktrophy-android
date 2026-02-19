@@ -348,26 +348,28 @@ public class StepKingBridge {
 
     /**
      * Determines if a step record is from a manual entry source.
+     * Uses recordingMethod (API 34+) as primary check — most reliable.
+     * Does NOT filter by package name alone since real sensor data can
+     * flow through Google Fit / Health Connect apps.
      */
     private boolean isManualSource(String packageName, StepsRecord record) {
-        if (packageName == null) return false;
-
-        // Known manual entry apps
-        if (MANUAL_ENTRY_PACKAGES.contains(packageName)) {
-            return true;
-        }
-
-        // Check recording method if available (API 34+)
+        // Primary: Check recording method (most reliable, API 34+)
         try {
             int recordingMethod = record.getMetadata().getRecordingMethod();
             // RECORDING_METHOD_MANUAL_ENTRY = 2
             if (recordingMethod == 2) {
+                Log.d(TAG, "Manual entry detected via recordingMethod=2, pkg=" + packageName);
                 return true;
             }
+            // If recordingMethod is available and NOT manual, trust it
+            // (RECORDING_METHOD_ACTIVELY_RECORDED=1, RECORDING_METHOD_AUTOMATIC=3, etc.)
+            return false;
         } catch (Exception e) {
-            // recordingMethod not available on older API
+            // recordingMethod not available — fall through to heuristic
         }
 
+        // Fallback for older API: don't filter by package name to avoid
+        // false positives (real sensor steps routed through Google Fit/HC)
         return false;
     }
 
@@ -434,11 +436,13 @@ public class StepKingBridge {
                         points = durationMins;
                     }
 
-                    boolean isManual = MANUAL_ENTRY_PACKAGES.contains(packageName);
+                    boolean isManual = false;
                     try {
                         int recordingMethod = record.getMetadata().getRecordingMethod();
                         if (recordingMethod == 2) isManual = true;
-                    } catch (Exception ignored) {}
+                    } catch (Exception ignored) {
+                        // recordingMethod not available on older API — don't filter
+                    }
 
                     if (isManual) {
                         manualPointsLocal += points;
