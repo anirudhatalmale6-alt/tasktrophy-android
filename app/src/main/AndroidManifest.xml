@@ -26,9 +26,10 @@
     <uses-permission android:name="android.permission.DOWNLOAD_WITHOUT_NOTIFICATION" />
     <uses-permission android:name="android.permission.READ_CLIPBOARD_SILENT" />
 
-    <!-- Health Connect permissions for Step King & Heart Points -->
+    <!-- Health Connect permissions for Step King, Heart Points & Ghost Runner Distance -->
     <uses-permission android:name="android.permission.health.READ_STEPS" />
     <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+    <uses-permission android:name="android.permission.health.READ_DISTANCE" />
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
 
     <uses-feature android:name="android.hardware.camera" />
