@@ -40,7 +40,7 @@
 
     <!--AdMob IDs-->
     <string name="admob_app_id" translatable="false">ca-app-pub-6353903215132082~5260206124</string>
-    <string name="admob_rewarded_id" translatable="false">ca-app-pub-6353903215132082/6590994194</string>
+    <string name="admob_rewarded_id" translatable="false">ca-app-pub-6353903215132082/9354694881</string>
     <string name="banner_footer" translatable="false">ca-app-pub-6353903215132082/3797092354</string>
     <string name="interstitial_full_screen" translatable="false">ca-app-pub-6353903215132082/4616082565</string>
 
