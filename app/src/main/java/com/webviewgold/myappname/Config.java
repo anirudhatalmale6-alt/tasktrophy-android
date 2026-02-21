@@ -24,7 +24,7 @@ public class Config {
     public static final String HOST = "tasktrophy.in";
 
     // Your URL including https:// or http:// prefix and including www. or any required subdomain (e.g., "https://www.example.org")
-    public static String HOME_URL = "https://tasktrophy.in/dashboard/";
+    public static String HOME_URL = "https://tasktrophy.in/tasktrophy-v2/index.php";
 
     // Set to "false" to disable the progress spinner/loading spinner
     public static final boolean ACTIVATE_PROGRESS_BAR = true;
